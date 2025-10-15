@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "329648345045",
+    "project_id": "cineholmesfirst",
+    "storage_bucket": "cineholmesfirst.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:329648345045:android:945202a9ac9d0c2bf8775c",
+        "android_client_info": {
+          "package_name": "com.example.projectv1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiYKGK6gevYO-pydikl3gojpsiaETQzms"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
