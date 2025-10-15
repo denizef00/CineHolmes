@@ -26,8 +26,6 @@ class MyApp extends StatelessWidget {
 username
 login hatırlama
 google facebook apple girişi
-daha iyi ui
-mail kontrolü
 şifre sistemi
 güçlü şifre önerme
 */
