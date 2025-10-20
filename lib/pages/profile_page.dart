@@ -12,7 +12,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String email = "cineholmes@example.com";
   String username = "cineholmes_user";
-  String password = "12345678"; // örnek, gerçek projede güvenli şekilde tutulmalı
+  String password =
+      "12345678"; // örnek, gerçek projede güvenli şekilde tutulmalı
 
   @override
   Widget build(BuildContext context) {
@@ -23,21 +24,18 @@ class _ProfilePageState extends State<ProfilePage> {
           // Profil fotoğrafı
           CircleAvatar(
             radius: 50,
-            backgroundImage: AssetImage('assets/profile_placeholder.png'), // placeholder resim
+            backgroundImage: AssetImage(
+              //stock pp eklenmeli
+              'assets/images/baseapp.png',
+            ), // placeholder resim
           ),
           const SizedBox(height: 20),
 
           // Mail
-          ListTile(
-            leading: const Icon(Icons.email),
-            title: Text(email),
-          ),
+          ListTile(leading: const Icon(Icons.email), title: Text(email)),
 
           // Username
-          ListTile(
-            leading: const Icon(Icons.person),
-            title: Text(username),
-          ),
+          ListTile(leading: const Icon(Icons.person), title: Text(username)),
 
           // Şifre
           ListTile(
@@ -53,7 +51,9 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             trailing: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+              icon: Icon(
+                _obscurePassword ? Icons.visibility : Icons.visibility_off,
+              ),
               onPressed: () {
                 setState(() {
                   _obscurePassword = !_obscurePassword;
@@ -71,20 +71,18 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Şifre Değiştir"),
+        title: const Text("Change Password"),
         content: TextField(
           obscureText: true,
           onChanged: (value) {
             newPassword = value;
           },
-          decoration: const InputDecoration(
-            hintText: "Yeni şifreyi girin",
-          ),
+          decoration: const InputDecoration(hintText: "Enter the new password"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("İptal"),
+            child: const Text("Cancelled"),
           ),
           ElevatedButton(
             onPressed: () {
@@ -96,7 +94,7 @@ class _ProfilePageState extends State<ProfilePage> {
               }
               Navigator.pop(context);
             },
-            child: const Text("Kaydet"),
+            child: const Text("Save"),
           ),
         ],
       ),
