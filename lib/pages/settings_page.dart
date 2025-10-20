@@ -15,17 +15,14 @@ class SettingsPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Uygulama Ayarları',
+            'Settings',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Koyu Tema',
-                style: TextStyle(fontSize: 18),
-              ),
+              const Text('Dark Theme', style: TextStyle(fontSize: 18)),
               Switch(
                 value: themeProvider.isDark,
                 onChanged: (value) {

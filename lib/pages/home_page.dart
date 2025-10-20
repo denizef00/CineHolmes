@@ -18,12 +18,17 @@ class HomePage extends StatelessWidget {
             style: TextStyle(color: isDark ? Colors.white : Colors.black87),
             decoration: InputDecoration(
               filled: true,
-              fillColor: isDark ? const Color(0xFF1E1E2C) : Colors.grey.shade200,
-              hintText: 'Film veya dizi ara...',
+              fillColor: isDark
+                  ? const Color(0xFF1E1E2C)
+                  : Colors.grey.shade200,
+              hintText: 'Searh Movies or Series',
               hintStyle: TextStyle(
                 color: isDark ? Colors.white54 : Colors.grey.shade600,
               ),
-              prefixIcon: Icon(Icons.search, color: isDark ? Colors.white70 : Colors.grey),
+              prefixIcon: Icon(
+                Icons.search,
+                color: isDark ? Colors.white70 : Colors.grey,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
@@ -42,7 +47,9 @@ class HomePage extends StatelessWidget {
               children: List.generate(6, (index) {
                 return Container(
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E2C) : Colors.grey.shade200,
+                    color: isDark
+                        ? const Color(0xFF1E1E2C)
+                        : Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(15),
                     boxShadow: [
                       BoxShadow(
@@ -58,11 +65,13 @@ class HomePage extends StatelessWidget {
                       Icon(
                         Icons.movie,
                         size: 48,
-                        color: isDark ? Colors.deepPurpleAccent.shade100 : Colors.deepPurple,
+                        color: isDark
+                            ? Colors.deepPurpleAccent.shade100
+                            : Colors.deepPurple,
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Film ${index + 1}',
+                        'Movie ${index + 1}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: isDark ? Colors.white : Colors.black87,
