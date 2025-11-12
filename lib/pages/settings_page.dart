@@ -28,7 +28,7 @@ class SettingsPage extends StatelessWidget {
                 onChanged: (value) {
                   themeProvider.toggleTheme();
                 },
-                activeColor: Colors.deepPurpleAccent,
+                activeThumbColor: Colors.deepPurpleAccent,
               ),
             ],
           ),

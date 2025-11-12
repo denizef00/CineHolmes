@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'pages/home_page.dart';
-import 'pages/library_page.dart';
-import 'pages/upload_page.dart';
-import 'pages/profile_page.dart';
-import 'pages/settings_page.dart';
+
+import 'pages/home_page.dart' show HomePage;
+import 'pages/library_page.dart' show LibraryPage;
+import 'pages/upload_page.dart' show UploadPage;
+import 'pages/profile_page.dart' show ProfilePage;
+import 'pages/settings_page.dart' show SettingsPage;
+
 
 class ThemeProvider extends ChangeNotifier {
   bool isDark = true;
@@ -26,14 +28,13 @@ class CineHolmesApp extends StatelessWidget {
         builder: (context, themeProvider, _) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            title: 'Cine Holmes',
+            title: 'CineHolmes',
             theme: themeProvider.isDark
                 ? ThemeData.dark().copyWith(
                     colorScheme: ColorScheme.dark(
                       primary: Colors.deepPurpleAccent.shade100,
                       secondary: Colors.purpleAccent,
                       surface: const Color(0xFF1E1E2C),
-                      background: const Color(0xFF121212),
                     ),
                     scaffoldBackgroundColor: const Color(0xFF121212),
                     appBarTheme: const AppBarTheme(
@@ -78,12 +79,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomePage(),
-    LibraryPage(),
-    UploadPage(),
-    ProfilePage(),
-    SettingsPage(),
+  final List<Widget> _pages =  [
+    const HomePage(),
+    const LibraryPage(),
+    const UploadPage(),
+    const ProfilePage(),
+    const SettingsPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -95,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cine Holmes 🎬')),
+      appBar: AppBar(title: const Text('CineHolmes ')),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,

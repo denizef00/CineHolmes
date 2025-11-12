@@ -22,13 +22,13 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Column(
         children: [
           // Profil fotoğrafı
-          CircleAvatar(
+         /* CircleAvatar(
             radius: 50,
             backgroundImage: AssetImage(
               //stock pp eklenmeli
               'assets/images/baseapp.png',
             ), // placeholder resim
-          ),
+          ),*/
           const SizedBox(height: 20),
 
           // Mail
