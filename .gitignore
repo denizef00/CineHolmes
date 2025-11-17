@@ -47,3 +47,5 @@ app.*.map.json
 #envoirment
 .env
 ".env" 
+.env
+.env
