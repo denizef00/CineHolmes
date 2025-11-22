@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../home_main.dart';
 import 'signup_page.dart';
+import '../services/auth_service.dart'; //  YENI EKLEME
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,6 +14,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService(); // YENI EKLEME
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -41,6 +43,62 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // 👇 YENİ FONKSİYONLAR - GOOGLE
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final userCredential = await _authService.signInWithGoogle();
+      if (userCredential != null && mounted) {
+        // AuthWrapper otomatik olarak home'a yönlendirecek
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 👇 YENİ FONKSİYONLAR - FACEBOOK
+  Future<void> _handleFacebookSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final userCredential = await _authService.signInWithFacebook();
+      if (userCredential != null && mounted) {
+        // AuthWrapper otomatik olarak home'a yönlendirecek
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 👇 YENİ FONKSİYONLAR - APPLE
+  Future<void> _handleAppleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final userCredential = await _authService.signInWithApple();
+      if (userCredential != null && mounted) {
+        // AuthWrapper otomatik olarak home'a yönlendirecek
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,12 +208,41 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
+                    GestureDetector(
+                      onTap: _isLoading ? null : _handleGoogleSignIn,
+                      child: const Icon(
+                        Icons.g_mobiledata,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Facebook butonu
+                    GestureDetector(
+                      onTap: _isLoading ? null : _handleFacebookSignIn,
+                      child: const Icon(
+                        Icons.facebook,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Apple butonu
+                    GestureDetector(
+                      onTap: _isLoading ? null : _handleAppleSignIn,
+                      child: const Icon(
+                        Icons.apple,
+                        color: Colors.white,
+                        size: 30,
+                  /*const [
                     Icon(Icons.g_mobiledata, color: Colors.white, size: 40),
                     SizedBox(width: 16),
                     Icon(Icons.facebook, color: Colors.white, size: 30),
                     SizedBox(width: 16),
-                    Icon(Icons.apple, color: Colors.white, size: 30),
+                    Icon(Icons.apple, color: Colors.white, size: 30),*/
+                      ),
+                    ),
                   ],
                 ),
               ],
