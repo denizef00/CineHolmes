@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../home_main.dart';
 import 'signup_page.dart';
 import '../services/auth_service.dart'; //  YENI EKLEME
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,6 +19,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  bool _rememberMe = false;
+
   Future<void> _login() async {
     setState(() {
       _isLoading = true;
@@ -29,6 +32,9 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool("rememberMe", _rememberMe);
 
       Navigator.pushReplacement(
         context,
@@ -99,6 +105,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,6 +161,10 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _passwordController,
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) {
+                    _login();
+                  },
                   decoration: InputDecoration(
                     labelText: "Password",
                     labelStyle: const TextStyle(color: Colors.white70),
@@ -164,7 +175,23 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
+                CheckboxListTile(
+                  title: const Text(
+                    "Remember Me",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  value: _rememberMe,
+                  onChanged: (value) {
+                    setState(() {
+                      _rememberMe = value ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  activeColor: Colors.deepPurpleAccent,
+                  checkColor: Colors.white,
+                ),
                 const SizedBox(height: 20),
+
                 if (_errorMessage != null)
                   Text(
                     _errorMessage!,
@@ -235,7 +262,7 @@ class _LoginPageState extends State<LoginPage> {
                         Icons.apple,
                         color: Colors.white,
                         size: 30,
-                  /*const [
+                        /*const [
                     Icon(Icons.g_mobiledata, color: Colors.white, size: 40),
                     SizedBox(width: 16),
                     Icon(Icons.facebook, color: Colors.white, size: 30),

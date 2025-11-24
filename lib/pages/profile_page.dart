@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:projectv1/screens/login_page.dart';
 import '../services/auth_service.dart'; // 👈 AuthService import edildi
 
 class ProfilePage extends StatefulWidget {
@@ -24,7 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // Firebase'den güncel kullanıcıyı çek
     final user = FirebaseAuth.instance.currentUser;
     await user?.reload(); // Firebase'den yenile
-    
+
     setState(() {
       _currentUser = FirebaseAuth.instance.currentUser;
     });
@@ -36,7 +37,8 @@ class _ProfilePageState extends State<ProfilePage> {
   // 👇 Firebase'den kullanıcı adı al
   String get username {
     // Display name varsa onu kullan
-    if (_currentUser?.displayName != null && _currentUser!.displayName!.isNotEmpty) {
+    if (_currentUser?.displayName != null &&
+        _currentUser!.displayName!.isNotEmpty) {
       return _currentUser!.displayName!;
     }
     // Yoksa email'in @ öncesi kısmını kullan
@@ -49,7 +51,9 @@ class _ProfilePageState extends State<ProfilePage> {
   // Giriş yöntemi kontrolü
   bool get isEmailPasswordUser {
     if (_currentUser == null) return false;
-    return _currentUser!.providerData.any((info) => info.providerId == 'password');
+    return _currentUser!.providerData.any(
+      (info) => info.providerId == 'password',
+    );
   }
 
   @override
@@ -71,10 +75,7 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 20),
 
           // Mail
-          ListTile(
-            leading: const Icon(Icons.email),
-            title: Text(email),
-          ),
+          ListTile(leading: const Icon(Icons.email), title: Text(email)),
 
           // Username
           ListTile(
@@ -102,7 +103,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -112,7 +115,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       if (!_obscurePassword) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Güvenlik nedeniyle şifre gösterilemiyor'),
+                            content: Text(
+                              'Güvenlik nedeniyle şifre gösterilemiyor',
+                            ),
                             duration: Duration(seconds: 2),
                           ),
                         );
@@ -172,7 +177,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // 👇 LOGOUT FONKSİYONU
   Future<void> _handleLogout() async {
-    // Onay dialogu göster
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -195,21 +199,29 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
 
-    // Kullanıcı "Çıkış Yap" dediyse
     if (shouldLogout == true) {
       try {
         await _authService.signOut();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Başarıyla çıkış yapıldı')),
           );
+
+          // 🔴 Burada login sayfasına yönlendirme yapıyoruz
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoginPage(),
+            ), // giriş ekranının adı
+            (route) => false,
+          );
         }
-        // AuthWrapper otomatik olarak login sayfasına yönlendirecek
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Çıkış hatası: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Çıkış hatası: $e')));
         }
       }
     }
@@ -241,24 +253,26 @@ class _ProfilePageState extends State<ProfilePage> {
               if (newUsername.isNotEmpty && newUsername != username) {
                 // Dialogu kapat
                 Navigator.pop(context);
-                
+
                 try {
                   // Firebase'de display name güncelle
                   await _currentUser?.updateDisplayName(newUsername);
-                  
+
                   // Kullanıcıyı yeniden yükle
                   await _loadUserData();
-                  
+
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Kullanıcı adı güncellendi ✅')),
+                      const SnackBar(
+                        content: Text('Kullanıcı adı güncellendi ✅'),
+                      ),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Hata: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Hata: $e')));
                   }
                 }
               } else {
@@ -369,7 +383,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Şifre başarıyla değiştirildi ✅')),
+                      const SnackBar(
+                        content: Text('Şifre başarıyla değiştirildi ✅'),
+                      ),
                     );
                   }
                 } on FirebaseAuthException catch (e) {
@@ -384,16 +400,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   if (mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(errorMessage)),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(errorMessage)));
                   }
                 } catch (e) {
                   if (mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Hata: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Hata: $e')));
                   }
                 }
               }

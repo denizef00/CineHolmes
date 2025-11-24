@@ -39,13 +39,16 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
     try {
       // 1. Firebase'de hesap oluştur
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
       // 2. Kullanıcı adını (display name) set et
-      await userCredential.user?.updateDisplayName(_usernameController.text.trim());
+      await userCredential.user?.updateDisplayName(
+        _usernameController.text.trim(),
+      );
       await userCredential.user?.reload();
 
       if (mounted) {
@@ -57,7 +60,7 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Hata: ${e.message}';
-      
+
       // Türkçe hata mesajları
       if (e.code == 'email-already-in-use') {
         errorMessage = 'Bu email zaten kullanımda';
@@ -66,7 +69,7 @@ class _SignUpPageState extends State<SignUpPage> {
       } else if (e.code == 'invalid-email') {
         errorMessage = 'Geçersiz email adresi';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -75,7 +78,6 @@ class _SignUpPageState extends State<SignUpPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-    
   }
 
   // 👇 YENİ FONKSİYONLAR - GOOGLE (username ile)
@@ -89,9 +91,9 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -108,9 +110,9 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -127,9 +129,9 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -181,7 +183,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // 👇 YENİ: Username field
                   TextField(
                     controller: _usernameController,
@@ -199,7 +201,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   TextField(
                     controller: _emailController,
                     style: const TextStyle(color: Colors.white),
@@ -334,27 +336,6 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -428,25 +409,6 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
     try {
       final userCredential = await _authService.signInWithFacebook();
-      if (userCredential != null && mounted) {
-        // AuthWrapper otomatik olarak home'a yönlendirecek
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // 👇 YENİ FONKSİYONLAR - APPLE
-  Future<void> _handleAppleSignUp() async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential = await _authService.signInWithApple();
       if (userCredential != null && mounted) {
         // AuthWrapper otomatik olarak home'a yönlendirecek
       }
