@@ -1,4 +1,4 @@
-# projectv1
+# CineHolmes
 
 A new Flutter project.
 
