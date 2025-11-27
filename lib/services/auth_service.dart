@@ -7,47 +7,48 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: '329648345045-l4ggeonelcjtq3jknbqiu4ttc59vmhbu.apps.googleusercontent.com'
+    clientId:
+        '329648345045-l4ggeonelcjtq3jknbqiu4ttc59vmhbu.apps.googleusercontent.com',
   );
 
-  // Mevcut kullanıcı
+  // Current user
   User? get currentUser => _auth.currentUser;
 
   // Auth state stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // Google ile giriş
+  // Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Google hesabı seçimi
+      // Select Google account
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
-        // Kullanıcı iptal etti
+        // User cancelled
         return null;
       }
 
-      // Google authentication detayları
-      final GoogleSignInAuthentication googleAuth = 
+      // Google authentication details
+      final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Firebase credential oluştur
+      // Create Firebase credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Firebase'e giriş yap
+      // Sign in to Firebase
       final userCredential = await _auth.signInWithCredential(credential);
       return userCredential;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Google girişinde bir hata oluştu: $e';
+      throw 'An error occurred during Google sign-in: $e';
     }
   }
 
-  // Facebook ile giriş
+  // Sign in with Facebook
   Future<UserCredential?> signInWithFacebook() async {
     try {
       // Facebook login dialog
@@ -56,32 +57,33 @@ class AuthService {
       );
 
       if (result.status == LoginStatus.success) {
-        // Access token al
+        // Get access token
         final AccessToken accessToken = result.accessToken!;
 
-        // Firebase credential oluştur
-        final OAuthCredential credential = 
-            FacebookAuthProvider.credential(accessToken.tokenString);
+        // Create Firebase credential
+        final OAuthCredential credential = FacebookAuthProvider.credential(
+          accessToken.tokenString,
+        );
 
-        // Firebase'e giriş yap
+        // Sign in to Firebase
         final userCredential = await _auth.signInWithCredential(credential);
         return userCredential;
       } else if (result.status == LoginStatus.cancelled) {
         return null;
       } else {
-        throw 'Facebook girişi başarısız: ${result.message}';
+        throw 'Facebook sign-in failed: ${result.message}';
       }
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Facebook girişinde bir hata oluştu: $e';
+      throw 'An error occurred during Facebook sign-in: $e';
     }
   }
 
-  // Apple ile giriş
+  // Sign in with Apple
   Future<UserCredential?> signInWithApple() async {
     try {
-      // Apple Sign-In isteği
+      // Apple Sign-In request
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
@@ -89,28 +91,28 @@ class AuthService {
         ],
       );
 
-      // OAuth credential oluştur
+      // Create OAuth credential
       final oauthCredential = OAuthProvider("apple.com").credential(
         idToken: appleCredential.identityToken,
         accessToken: appleCredential.authorizationCode,
       );
 
-      // Firebase'e giriş yap
+      // Sign in to Firebase
       final userCredential = await _auth.signInWithCredential(oauthCredential);
       return userCredential;
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
         return null;
       }
-      throw 'Apple girişi başarısız: ${e.message}';
+      throw 'Apple sign-in failed: ${e.message}';
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Apple girişinde bir hata oluştu: $e';
+      throw 'An error occurred during Apple sign-in: $e';
     }
   }
 
-  // Email/Password ile kayıt
+  // Sign up with Email/Password
   Future<UserCredential> signUpWithEmail({
     required String email,
     required String password,
@@ -124,11 +126,11 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Kayıt sırasında bir hata oluştu: $e';
+      throw 'An error occurred during sign-up: $e';
     }
   }
 
-  // Email/Password ile giriş
+  // Sign in with Email/Password
   Future<UserCredential> signInWithEmail({
     required String email,
     required String password,
@@ -142,22 +144,22 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Giriş sırasında bir hata oluştu: $e';
+      throw 'An error occurred during sign-in: $e';
     }
   }
 
-  // Şifre sıfırlama
+  // Reset password
   Future<void> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw 'Şifre sıfırlama e-postası gönderilemedi: $e';
+      throw 'Failed to send password reset email: $e';
     }
   }
 
-  // Çıkış yap
+  // Sign out
   Future<void> signOut() async {
     try {
       await Future.wait([
@@ -166,33 +168,33 @@ class AuthService {
         FacebookAuth.instance.logOut(),
       ]);
     } catch (e) {
-      throw 'Çıkış yapılırken bir hata oluştu: $e';
+      throw 'An error occurred during sign-out: $e';
     }
   }
 
-  // Firebase Auth hatalarını Türkçe mesajlara çevir
+  // Convert Firebase Auth errors to English messages
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
-        return 'Bu e-posta ile kayıtlı kullanıcı bulunamadı.';
+        return 'No user found with this email.';
       case 'wrong-password':
-        return 'Hatalı şifre girdiniz.';
+        return 'Incorrect password entered.';
       case 'email-already-in-use':
-        return 'Bu e-posta adresi zaten kullanımda.';
+        return 'This email address is already in use.';
       case 'invalid-email':
-        return 'Geçersiz e-posta adresi.';
+        return 'Invalid email address.';
       case 'weak-password':
-        return 'Şifre çok zayıf. En az 6 karakter olmalı.';
+        return 'Password is too weak. It should be at least 6 characters.';
       case 'user-disabled':
-        return 'Bu hesap devre dışı bırakılmış.';
+        return 'This account has been disabled.';
       case 'too-many-requests':
-        return 'Çok fazla deneme yaptınız. Lütfen daha sonra tekrar deneyin.';
+        return 'Too many attempts. Please try again later.';
       case 'operation-not-allowed':
-        return 'Bu işlem şu anda kullanılamıyor.';
+        return 'This operation is currently not allowed.';
       case 'account-exists-with-different-credential':
-        return 'Bu e-posta başka bir yöntemle kayıtlı. Lütfen o yöntemi kullanın.';
+        return 'This email is registered with a different method. Please use that method.';
       default:
-        return 'Bir hata oluştu: ${e.message}';
+        return 'An error occurred: ${e.message}';
     }
   }
 }

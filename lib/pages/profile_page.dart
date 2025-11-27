@@ -52,7 +52,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool get isEmailPasswordUser {
     if (_currentUser == null) return false;
     return _currentUser!.providerData.any(
-      (info) => info.providerId == 'Password',
+      (info) => info.providerId == 'password',
     );
   }
 
@@ -263,9 +263,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Username Updated ✅'),
-                      ),
+                      const SnackBar(content: Text('Username Updated ✅')),
                     );
                   }
                 } catch (e) {
@@ -291,7 +289,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!isEmailPasswordUser) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Password cannot be changed for social media accounts.'),
+          content: Text(
+            'Password cannot be changed for social media accounts.',
+          ),
         ),
       );
       return;
@@ -383,9 +383,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Password updated.✅'),
-                      ),
+                      const SnackBar(content: Text('Password updated.✅')),
                     );
                   }
                 } on FirebaseAuthException catch (e) {
@@ -395,7 +393,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   } else if (e.code == 'weak-password') {
                     errorMessage = 'The password you entered is too weak';
                   } else if (e.code == 'requires-recent-login') {
-                    errorMessage = 'For security reasons, please re-authenticate.';
+                    errorMessage =
+                        'For security reasons, please re-authenticate.';
                   }
 
                   if (mounted) {
@@ -421,107 +420,3 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
-
-/*import 'package:flutter/material.dart';
-
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
-
-  @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<ProfilePage> {
-  bool _obscurePassword = true;
-
-  String email = "cineholmes@example.com";
-  String username = "cineholmes_user";
-  String password =
-      "12345678"; // örnek, gerçek projede güvenli şekilde tutulmalı
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Profil fotoğrafı
-         /* CircleAvatar(
-            radius: 50,
-            backgroundImage: AssetImage(
-              //stock pp eklenmeli
-              'assets/images/baseapp.png',
-            ), // placeholder resim
-          ),*/
-          const SizedBox(height: 20),
-
-          // Mail
-          ListTile(leading: const Icon(Icons.email), title: Text(email)),
-
-          // Username
-          ListTile(leading: const Icon(Icons.person), title: Text(username)),
-
-          // Şifre
-          ListTile(
-            leading: const Icon(Icons.lock),
-            title: GestureDetector(
-              onTap: () {
-                // Şifre değiştirme dialogu
-                _showChangePasswordDialog();
-              },
-              child: Text(
-                _obscurePassword ? "********" : password,
-                style: const TextStyle(letterSpacing: 2),
-              ),
-            ),
-            trailing: IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility : Icons.visibility_off,
-              ),
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog() {
-    String newPassword = "";
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Change Password"),
-        content: TextField(
-          obscureText: true,
-          onChanged: (value) {
-            newPassword = value;
-          },
-          decoration: const InputDecoration(hintText: "Enter the new password"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelled"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (newPassword.isNotEmpty) {
-                setState(() {
-                  password = newPassword;
-                  _obscurePassword = true;
-                });
-              }
-              Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
-  }
-}*/
