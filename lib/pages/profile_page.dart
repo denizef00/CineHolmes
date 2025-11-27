@@ -32,7 +32,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // 👇 Firebase'den email al
-  String get email => _currentUser?.email ?? "Email bulunamadı";
+  String get email => _currentUser?.email ?? "Email not found.";
 
   // 👇 Firebase'den kullanıcı adı al
   String get username {
@@ -42,7 +42,7 @@ class _ProfilePageState extends State<ProfilePage> {
       return _currentUser!.displayName!;
     }
     // Yoksa email'in @ öncesi kısmını kullan
-    return _currentUser?.email?.split('@')[0] ?? "Kullanıcı";
+    return _currentUser?.email?.split('@')[0] ?? "User";
   }
 
   // 👇 Şifre (Firebase şifre döndürmez, placeholder)
@@ -52,7 +52,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool get isEmailPasswordUser {
     if (_currentUser == null) return false;
     return _currentUser!.providerData.any(
-      (info) => info.providerId == 'password',
+      (info) => info.providerId == 'Password',
     );
   }
 
@@ -116,7 +116,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Güvenlik nedeniyle şifre gösterilemiyor',
+                              'Password cannot be shown for security reasons.',
                             ),
                             duration: Duration(seconds: 2),
                           ),
@@ -145,7 +145,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: Text(
-                'Sosyal medya ile giriş yaptınız',
+                'You have successfully logged in with social media.',
                 style: TextStyle(color: Colors.grey[600], fontSize: 14),
               ),
             ),
@@ -158,7 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: ElevatedButton.icon(
               onPressed: _handleLogout,
               icon: const Icon(Icons.logout),
-              label: const Text('Çıkış Yap'),
+              label: const Text('Log Out'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
@@ -180,12 +180,12 @@ class _ProfilePageState extends State<ProfilePage> {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Çıkış Yap'),
-        content: const Text('Çıkış yapmak istediğinize emin misiniz?'),
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('İptal'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -193,7 +193,7 @@ class _ProfilePageState extends State<ProfilePage> {
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Çıkış Yap'),
+            child: const Text('Log Out'),
           ),
         ],
       ),
@@ -205,7 +205,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Başarıyla çıkış yapıldı')),
+            const SnackBar(content: Text('Successfully logged out.')),
           );
 
           // 🔴 Burada login sayfasına yönlendirme yapıyoruz
@@ -221,7 +221,7 @@ class _ProfilePageState extends State<ProfilePage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('Çıkış hatası: $e')));
+          ).showSnackBar(SnackBar(content: Text('Logout Error: $e')));
         }
       }
     }
@@ -235,18 +235,18 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Kullanıcı Adını Değiştir"),
+        title: const Text("Change Username"),
         content: TextField(
           controller: controller,
           onChanged: (value) {
             newUsername = value;
           },
-          decoration: const InputDecoration(hintText: "Yeni kullanıcı adı"),
+          decoration: const InputDecoration(hintText: "New Username"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("İptal"),
+            child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -264,7 +264,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Kullanıcı adı güncellendi ✅'),
+                        content: Text('Username Updated ✅'),
                       ),
                     );
                   }
@@ -272,14 +272,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (mounted) {
                     ScaffoldMessenger.of(
                       context,
-                    ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 }
               } else {
                 Navigator.pop(context);
               }
             },
-            child: const Text("Kaydet"),
+            child: const Text("Save"),
           ),
         ],
       ),
@@ -291,7 +291,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!isEmailPasswordUser) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Sosyal medya hesapları için şifre değiştirilemez'),
+          content: Text('Password cannot be changed for social media accounts.'),
         ),
       );
       return;
@@ -305,7 +305,7 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Şifre Değiştir"),
+        title: const Text("Change Password"),
         content: Form(
           key: formKey,
           child: Column(
@@ -315,12 +315,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 obscureText: true,
                 onChanged: (value) => currentPassword = value,
                 decoration: const InputDecoration(
-                  labelText: "Mevcut Şifre",
-                  hintText: "Mevcut şifrenizi girin",
+                  labelText: "Current Password",
+                  hintText: "Enter your current password.",
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Mevcut şifre gerekli';
+                    return 'Current password is required.';
                   }
                   return null;
                 },
@@ -330,15 +330,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 obscureText: true,
                 onChanged: (value) => newPassword = value,
                 decoration: const InputDecoration(
-                  labelText: "Yeni Şifre",
-                  hintText: "Yeni şifrenizi girin",
+                  labelText: "New Password",
+                  hintText: "Enter your new password",
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Yeni şifre gerekli';
+                    return 'A new password is required';
                   }
                   if (value.length < 6) {
-                    return 'Şifre en az 6 karakter olmalı';
+                    return 'Password must be 6 characters minimum';
                   }
                   return null;
                 },
@@ -348,12 +348,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 obscureText: true,
                 onChanged: (value) => confirmPassword = value,
                 decoration: const InputDecoration(
-                  labelText: "Yeni Şifre (Tekrar)",
-                  hintText: "Yeni şifrenizi tekrar girin",
+                  labelText: "Confirm New Password",
+                  hintText: "Verify New Password",
                 ),
                 validator: (value) {
                   if (value != newPassword) {
-                    return 'Şifreler eşleşmiyor';
+                    return 'Passwords mismatch';
                   }
                   return null;
                 },
@@ -364,7 +364,7 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("İptal"),
+            child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -384,18 +384,18 @@ class _ProfilePageState extends State<ProfilePage> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Şifre başarıyla değiştirildi ✅'),
+                        content: Text('Password updated.✅'),
                       ),
                     );
                   }
                 } on FirebaseAuthException catch (e) {
-                  String errorMessage = 'Hata oluştu';
+                  String errorMessage = 'Error';
                   if (e.code == 'wrong-password') {
-                    errorMessage = 'Mevcut şifre hatalı';
+                    errorMessage = 'Incorrect current password.';
                   } else if (e.code == 'weak-password') {
-                    errorMessage = 'Şifre çok zayıf';
+                    errorMessage = 'The password you entered is too weak';
                   } else if (e.code == 'requires-recent-login') {
-                    errorMessage = 'Güvenlik nedeniyle tekrar giriş yapın';
+                    errorMessage = 'For security reasons, please re-authenticate.';
                   }
 
                   if (mounted) {
@@ -409,12 +409,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(
                       context,
-                    ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 }
               }
             },
-            child: const Text("Değiştir"),
+            child: const Text("Change"),
           ),
         ],
       ),

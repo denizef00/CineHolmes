@@ -29,7 +29,7 @@ class _LibraryPageState extends State<LibraryPage> {
     final isLoading = libraryProvider.isLoading;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Library 📚'), centerTitle: true),
+      appBar: AppBar(title: const Text('My Library'), centerTitle: true),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: libraryItems.isEmpty
