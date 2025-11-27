@@ -83,10 +83,7 @@ class _HomePageState extends State<HomePage> {
         _searchCtrl.text.trim().isNotEmpty && _searchResults.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('CineHolmes'),
-        centerTitle: true,
-      ),
+      //appBar: AppBar(title: const Text('CineHolmes'),centerTitle: true,),
       body: Column(
         children: [
           // 🔎 arama çubuğu
@@ -111,14 +108,11 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          if (_searching)
-            const LinearProgressIndicator(minHeight: 2),
+          if (_searching) const LinearProgressIndicator(minHeight: 2),
 
           // içerik
           Expanded(
-            child: showingSearch
-                ? _buildSearchList()
-                : _buildTrendingGrid(),
+            child: showingSearch ? _buildSearchList() : _buildTrendingGrid(),
           ),
         ],
       ),
@@ -178,7 +172,7 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.black.withOpacity(0.2),
                     blurRadius: 4,
                     offset: const Offset(2, 2),
-                  )
+                  ),
                 ],
               ),
               child: Column(
@@ -186,22 +180,27 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Expanded(
                     child: ClipRRect(
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(14)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(14),
+                      ),
                       child: poster.isNotEmpty
                           ? Image.network(
                               poster,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
                                 color: Colors.grey.shade800,
-                                child: const Icon(Icons.broken_image,
-                                    color: Colors.white),
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white,
+                                ),
                               ),
                             )
                           : Container(
                               color: Colors.grey.shade800,
-                              child: const Icon(Icons.broken_image,
-                                  color: Colors.white),
+                              child: const Icon(
+                                Icons.broken_image,
+                                color: Colors.white,
+                              ),
                             ),
                     ),
                   ),
@@ -237,7 +236,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ],
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -254,7 +253,8 @@ class _HomePageState extends State<HomePage> {
       itemBuilder: (context, index) {
         final item = _searchResults[index];
         return ListTile(
-          leading: item['poster'] != null && item['poster'].toString().isNotEmpty
+          leading:
+              item['poster'] != null && item['poster'].toString().isNotEmpty
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: Image.network(
