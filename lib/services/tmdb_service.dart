@@ -9,7 +9,7 @@ class TMDBService {
   String get _apiKey => Config.tmdbApiKey;
 
   // ===============================
-  // 1) SEARCH (HomePage burayı kullanıyor)
+  // 1) SEARCH MULTI (HomePage)
   // ===============================
   Future<List<Map<String, dynamic>>> searchMulti(String query, {int limit = 8}) async {
     if (query.trim().isEmpty) return [];
@@ -30,13 +30,11 @@ class TMDBService {
       final tvResults =
           jsonDecode(responses[1].body)['results'] as List<dynamic>? ?? [];
 
-      // hepsini birleştir
       final combined = <Map<String, dynamic>>[
         ...movieResults.map((m) => _mapSearchItem(m, 'movie')),
         ...tvResults.map((t) => _mapSearchItem(t, 'tv')),
       ];
 
-      // popülerliğe göre sırala
       combined.sort(
         (a, b) =>
             (b['popularity'] as num).compareTo(a['popularity'] as num),
@@ -48,9 +46,27 @@ class TMDBService {
     }
   }
 
-  // istersen eski adıyla da kullan diye bırakıyorum
-  Future<List<Map<String, dynamic>>> searchTitles(String query, {int limit = 8}) {
-    return searchMulti(query, limit: limit);
+  // ===============================
+  // 2) SEARCH MOVIE (Sadece Film)
+  // ===============================
+  Future<Map<String, dynamic>?> searchMovie(String query) async {
+    if (query.trim().isEmpty) return null;
+
+    try {
+      final url = Uri.parse(
+          '$_baseUrl/search/movie?api_key=$_apiKey&query=$query');
+      final res = await http.get(url);
+
+      if (res.statusCode != 200) return null;
+
+      final results = jsonDecode(res.body)['results'] as List<dynamic>? ?? [];
+      if (results.isEmpty) return null;
+
+      // İlk sonucu alıyoruz
+      return _mapSearchItem(results[0], 'movie');
+    } catch (e) {
+      return null;
+    }
   }
 
   Map<String, dynamic> _mapSearchItem(dynamic data, String forcedType) {
@@ -73,7 +89,7 @@ class TMDBService {
   }
 
   // ===============================
-  // 2) DETAY
+  // 3) DETAY
   // ===============================
   Future<Map<String, dynamic>> fetchDetailsById(int id, String type) async {
     try {
@@ -98,7 +114,6 @@ class TMDBService {
         'genres': (data['genres'] as List<dynamic>? ?? [])
             .map((g) => g['name'].toString())
             .toList(),
-        // film ise runtime, dizi ise season
         'runtime': data['runtime'], // movie
         'number_of_seasons': data['number_of_seasons'], // tv
         'type': type,
@@ -109,7 +124,7 @@ class TMDBService {
   }
 
   // ===============================
-  // 3) CAST
+  // 4) CAST
   // ===============================
   Future<List<Map<String, dynamic>>> fetchCast(int id, String type) async {
     try {
@@ -136,7 +151,7 @@ class TMDBService {
   }
 
   // ===============================
-  // 4) REVIEWS
+  // 5) REVIEWS
   // ===============================
   Future<List<Map<String, dynamic>>> fetchReviews(int id, String type) async {
     try {
@@ -160,7 +175,7 @@ class TMDBService {
   }
 
   // ===============================
-  // 5) TRAILER
+  // 6) TRAILER
   // ===============================
   Future<String?> fetchTrailer(int id, String type) async {
     try {
@@ -186,7 +201,7 @@ class TMDBService {
   }
 
   // ===============================
-  // 6) SİMİLAR
+  // 7) SIMILAR
   // ===============================
   Future<List<Map<String, dynamic>>> fetchSimilar(int id, String type) async {
     try {
@@ -199,7 +214,6 @@ class TMDBService {
       final results = data['results'] as List<dynamic>? ?? [];
 
       return results.take(10).map((m) {
-        // bazen similar endpoint media_type dönmez, o yüzden fallback
         final detectedType = m['media_type'];
         return {
           'id': m['id'],
@@ -218,7 +232,7 @@ class TMDBService {
   }
 
   // ===============================
-  // 7) TRENDING
+  // 8) TRENDING
   // ===============================
   Future<List<Map<String, dynamic>>> fetchTrending() async {
     try {
