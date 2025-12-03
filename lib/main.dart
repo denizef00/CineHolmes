@@ -3,9 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'package:CineHolmes/screens/login_page.dart';
-import 'package:CineHolmes/home_main.dart';
-import 'package:CineHolmes/pages/library_provider.dart';
+import 'package:cineholmes/screens/login_page.dart';
+import 'package:cineholmes/home_main.dart';
+import 'package:cineholmes/pages/library_provider.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {

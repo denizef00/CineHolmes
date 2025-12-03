@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:CineHolmes/screens/login_page.dart';
+import 'package:cineholmes/screens/login_page.dart';
 import '../services/auth_service.dart'; // 👈 AuthService import edildi
 
 class ProfilePage extends StatefulWidget {
