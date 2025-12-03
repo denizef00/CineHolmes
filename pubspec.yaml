@@ -1,4 +1,4 @@
-name: projectv1
+name: CineHolmes
 description: "A new Flutter project."
 publish_to: "none"
 
@@ -36,7 +36,6 @@ dependencies:
   # Media Pickers
   image_picker: ^1.2.0
   file_picker: ^8.1.2 # Video/ses dosyası seçimi için
-  
 
 dev_dependencies:
   flutter_test:
