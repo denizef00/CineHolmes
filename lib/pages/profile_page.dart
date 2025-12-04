@@ -101,37 +101,7 @@ class _ProfilePageState extends State<ProfilePage> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                      // Firebase şifre gösteremez uyarısı
-                      if (!_obscurePassword) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Password cannot be shown for security reasons.',
-                            ),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                        // 2 saniye sonra tekrar gizle
-                        Future.delayed(const Duration(seconds: 2), () {
-                          if (mounted) {
-                            setState(() {
-                              _obscurePassword = true;
-                            });
-                          }
-                        });
-                      }
-                    },
-                  ),
+                  
                   IconButton(
                     icon: const Icon(Icons.edit),
                     onPressed: _showChangePasswordDialog,
