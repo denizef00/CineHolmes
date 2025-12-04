@@ -34,19 +34,15 @@ class LibraryProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('library')
-          .get();
+      final snapshot = await _userLibrary!.get();
 
       _libraryItems = snapshot.docs.map((doc) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         data['firestoreId'] = doc.id; // Firestore document ID'sini de sakla
         return data;
       }).toList();
     } catch (e) {
-      print('Error loading library: $e');
+      print('❌ Error loading library: $e');
       _libraryItems = [];
     } finally {
       _isLoading = false;
@@ -62,13 +58,13 @@ class LibraryProvider extends ChangeNotifier {
   // Kütüphaneye ekle (Firestore'a kaydet)
   Future<void> addToLibrary(Map<String, dynamic> item) async {
     if (_userLibrary == null) {
-      print('No user logged in');
+      print('⚠️ No user logged in');
       return;
     }
 
     // Zaten ekliyse ekleme
     if (isInLibrary(item['id'])) {
-      print('Item already in library');
+      print('ℹ️ Item already in library');
       return;
     }
 
@@ -81,7 +77,7 @@ class LibraryProvider extends ChangeNotifier {
         'rating': item['rating'],
         'year': item['year'],
         'type': item['type'],
-        'addedAt': FieldValue.serverTimestamp(), // Eklenme tarihi
+        'addedAt': FieldValue.serverTimestamp(),
       });
 
       // Local listeye de ekle
@@ -102,14 +98,13 @@ class LibraryProvider extends ChangeNotifier {
     if (_userLibrary == null) return;
 
     try {
-      // Local listede bul
       final item = _libraryItems.firstWhere(
         (item) => item['id'] == id,
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
 
       if (item.isEmpty || item['firestoreId'] == null) {
-        print('Item not found in library');
+        print('⚠️ Item not found in library');
         return;
       }
 
@@ -117,7 +112,7 @@ class LibraryProvider extends ChangeNotifier {
       await _userLibrary!.doc(item['firestoreId']).delete();
 
       // Local listeden çıkar
-      _libraryItems.removeWhere((item) => item['id'] == id);
+      _libraryItems.removeWhere((element) => element['id'] == id);
 
       notifyListeners();
       print('✅ Removed from library: ${item['title']}');

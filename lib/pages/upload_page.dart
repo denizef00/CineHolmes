@@ -7,8 +7,14 @@ import 'package:http_parser/http_parser.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart'; // Provider
+
 import '../services/tmdb_service.dart';
 import 'info_page.dart';
+import 'library_provider.dart'; // SAME folder (pages) -> use this
+// If you will use MovieCard from lib/movie_card.dart elsewhere:
+// import '../movie_card.dart';
+ // 🔑 Yolunu proje yapına göre doğrula
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -40,7 +46,7 @@ class _UploadPageState extends State<UploadPage> {
     _loadUserHistory();
   }
 
-  // Kullanıcının history'sini Firestore'dan yükle
+  // Firestore'dan kullanıcının upload geçmişini yükle
   Future<void> _loadUserHistory() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -69,7 +75,7 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Yeni film/dizi bilgisini Firestore'a kaydet
+  // Yeni sonucu Firestore'a kaydet ve yerel history'ye ekle
   Future<void> _saveToUserHistory(Map<String, dynamic> movieInfo) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -81,10 +87,8 @@ class _UploadPageState extends State<UploadPage> {
           .collection('upload_history')
           .add({...movieInfo, 'timestamp': FieldValue.serverTimestamp()});
 
-      // Yerel history'yi de güncelle
       setState(() {
         history.insert(0, {...movieInfo, 'docId': docRef.id});
-        // Max 20 item tut
         if (history.length > 20) {
           history = history.sublist(0, 20);
         }
@@ -94,14 +98,13 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // History'den film/dizi sil
+  // History'den bir öğeyi sil
   Future<void> _deleteFromHistory(int index) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
     final movie = history[index];
     final docId = movie['docId'];
-
     if (docId == null) return;
 
     try {
@@ -138,7 +141,7 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Silme onay dialogu
+  // Silme onayı diyalogu
   Future<void> _showDeleteConfirmation(int index) async {
     final movie = history[index];
     final confirmed = await showDialog<bool>(
@@ -235,9 +238,7 @@ class _UploadPageState extends State<UploadPage> {
 
     final XFile? file = await picker
         .pickVideo(source: ImageSource.gallery)
-        .catchError((_) {
-          return null;
-        });
+        .catchError((_) => null);
 
     if (!mounted) return;
     if (file == null) {
@@ -324,7 +325,6 @@ class _UploadPageState extends State<UploadPage> {
       String? resultText;
 
       for (final modelName in modelsToTry) {
-        print('📄 Trying model: $modelName');
         final analyzeUrl = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
         );
@@ -366,14 +366,12 @@ Be precise. Just give me one line, no extra text.''',
           }),
         );
 
-        print('📡 Response status: ${response.statusCode}');
         if (response.statusCode == 200) {
           final jsonResponse = jsonDecode(response.body);
           if (jsonResponse['candidates'] != null &&
               jsonResponse['candidates'].isNotEmpty) {
             resultText =
                 jsonResponse['candidates'][0]['content']['parts'][0]['text'];
-            print('✅ Gemini result: $resultText');
             break;
           }
         } else {
@@ -390,8 +388,6 @@ Be precise. Just give me one line, no extra text.''',
           final year = parts[1].trim();
           final type = parts[2].trim().toLowerCase();
 
-          print('🎬 Parsed: Title=$title, Year=$year, Type=$type');
-
           setState(() {
             status = 'Searching in TMDB database...';
           });
@@ -403,7 +399,6 @@ Be precise. Just give me one line, no extra text.''',
               movieData = movieInfo;
               status = 'Successfully identified!';
             });
-            // Firebase'e kaydet
             await _saveToUserHistory(movieInfo);
           } else {
             setState(() {
@@ -411,7 +406,6 @@ Be precise. Just give me one line, no extra text.''',
             });
           }
         } else {
-          print('❌ Invalid format: $resultText');
           setState(() {
             status = 'Invalid response format from AI';
           });
@@ -426,7 +420,6 @@ Be precise. Just give me one line, no extra text.''',
       setState(() {
         status = 'Error: $e';
       });
-      print('❌ Exception: $e');
     } finally {
       setState(() => _isAnalyzing = false);
     }
@@ -447,10 +440,7 @@ Be precise. Just give me one line, no extra text.''',
         final data = jsonDecode(response.body);
         final results = data['results'] as List;
 
-        if (results.isEmpty) {
-          print('❌ No results found for: $title');
-          return null;
-        }
+        if (results.isEmpty) return null;
 
         Map<String, dynamic>? bestMatch;
         double bestScore = 0;
@@ -458,9 +448,8 @@ Be precise. Just give me one line, no extra text.''',
         for (var result in results) {
           double score = 100.0;
 
-          final resultTitle = type == 'movie'
-              ? (result['title'] ?? '')
-              : (result['name'] ?? '');
+          final resultTitle =
+              type == 'movie' ? (result['title'] ?? '') : (result['name'] ?? '');
           final resultYear = type == 'movie'
               ? (result['release_date'] ?? '').split('-').first
               : (result['first_air_date'] ?? '').split('-').first;
@@ -482,8 +471,6 @@ Be precise. Just give me one line, no extra text.''',
           final popularity = (result['popularity'] ?? 0).toDouble();
           score += popularity / 10;
 
-          print('📊 $resultTitle ($resultYear) - Score: $score');
-
           if (score > bestScore) {
             bestScore = score;
             bestMatch = result;
@@ -491,10 +478,6 @@ Be precise. Just give me one line, no extra text.''',
         }
 
         if (bestMatch != null) {
-          print(
-            '🎯 Best match: ${type == 'movie' ? bestMatch['title'] : bestMatch['name']} (Score: $bestScore)',
-          );
-
           return {
             'id': bestMatch['id'],
             'title': type == 'movie' ? bestMatch['title'] : bestMatch['name'],
@@ -502,7 +485,9 @@ Be precise. Just give me one line, no extra text.''',
             'poster': bestMatch['poster_path'] != null
                 ? 'https://image.tmdb.org/t/p/w500${bestMatch['poster_path']}'
                 : null,
-            'rating': bestMatch['vote_average']?.toStringAsFixed(1) ?? 'N/A',
+            'rating': (bestMatch['vote_average'] is num)
+                ? (bestMatch['vote_average'] as num).toStringAsFixed(1)
+                : 'N/A',
             'year': type == 'movie'
                 ? (bestMatch['release_date'] ?? '').split('-').first
                 : (bestMatch['first_air_date'] ?? '').split('-').first,
@@ -522,7 +507,6 @@ Be precise. Just give me one line, no extra text.''',
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Upload butonu - tam ortalanmış
           Center(
             child: ElevatedButton.icon(
               icon: const Icon(Icons.upload),
@@ -530,8 +514,8 @@ Be precise. Just give me one line, no extra text.''',
                 isPicking
                     ? "Opening gallery..."
                     : _isAnalyzing
-                    ? "Analyzing..."
-                    : "Upload and identify",
+                        ? "Analyzing..."
+                        : "Upload and identify",
               ),
               onPressed: (isPicking || _isAnalyzing) ? null : _pickVideo,
             ),
@@ -544,17 +528,54 @@ Be precise. Just give me one line, no extra text.''',
           ),
           if (_isAnalyzing) const SizedBox(height: 20),
           if (_isAnalyzing) const CircularProgressIndicator(),
+
+          // Poster + sağ üstte kalp
           if (movieData != null) ...[
             const SizedBox(height: 20),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                movieData!['poster'] ?? '',
-                height: 250,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.broken_image, size: 100),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    movieData!['poster'] ?? '',
+                    height: 250,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.broken_image, size: 100),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Consumer<LibraryProvider>(
+                    builder: (context, libraryProvider, _) {
+                      final id = movieData!['id'] as int;
+                      final isFav = libraryProvider.isInLibrary(id);
+
+                      return GestureDetector(
+                        onTap: () {
+                          libraryProvider.toggleLibrary({
+                            'id': id,
+                            'title': movieData!['title'],
+                            'poster': movieData!['poster'],
+                            'type': movieData!['type'],
+                            'year': movieData!['year'],
+                            'rating': movieData!['rating'],
+                          });
+                        },
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black.withOpacity(0.6),
+                          child: Icon(
+                            isFav ? Icons.favorite : Icons.favorite_border,
+                            color:
+                                isFav ? const Color(0xFF6A0DAD) : Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Text(
@@ -590,6 +611,7 @@ Be precise. Just give me one line, no extra text.''',
               },
             ),
           ],
+
           if (_isLoadingHistory)
             const Padding(
               padding: EdgeInsets.only(top: 30),
@@ -639,18 +661,6 @@ Be precise. Just give me one line, no extra text.''',
                                     const Icon(Icons.broken_image, size: 50),
                               ),
                             ),
-                            // Silme ikonu (long press hint)
-                            Positioned(
-                              top: 2,
-                              right: 2,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 5),
@@ -676,6 +686,7 @@ Be precise. Just give me one line, no extra text.''',
     );
   }
 }
+
 
 /*import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
