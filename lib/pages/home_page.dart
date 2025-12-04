@@ -228,8 +228,7 @@ class _HomePageState extends State<HomePage> {
                             },
                             child: CircleAvatar(
                               radius: 18,
-                              backgroundColor:
-                                  Colors.black.withOpacity(0.6),
+                              backgroundColor: Colors.black.withOpacity(0.6),
                               child: Icon(
                                 isFav ? Icons.favorite : Icons.favorite_border,
                                 color: isFav
@@ -252,36 +251,35 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          
-                        Text(
-                          item['title'] ?? '',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                          Text(
+                            item['title'] ?? '',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '⭐ ${item['rating'] ?? 'N/A'}  •  ${item['year'] ?? ''}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
+                          const SizedBox(height: 4),
+                          Text(
+                            '⭐ ${item['rating'] ?? 'N/A'}  •  ${item['year'] ?? ''}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item['type'] == 'tv' ? 'TV Show' : 'Movie',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white38,
+                          const SizedBox(height: 2),
+                          Text(
+                            item['type'] == 'tv' ? 'TV Show' : 'Movie',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white38,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -298,8 +296,8 @@ class _HomePageState extends State<HomePage> {
       itemBuilder: (context, index) {
         final item = _searchResults[index];
         return ListTile(
-          leading: item['poster'] != null &&
-                  item['poster'].toString().isNotEmpty
+          leading:
+              item['poster'] != null && item['poster'].toString().isNotEmpty
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: Image.network(
@@ -338,5 +336,3 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
-

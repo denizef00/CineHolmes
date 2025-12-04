@@ -14,7 +14,7 @@ import 'info_page.dart';
 import 'library_provider.dart'; // SAME folder (pages) -> use this
 // If you will use MovieCard from lib/movie_card.dart elsewhere:
 // import '../movie_card.dart';
- // 🔑 Yolunu proje yapına göre doğrula
+// 🔒 Yolunu proje yapısına göre doğrula
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -70,7 +70,7 @@ class _UploadPageState extends State<UploadPage> {
         _isLoadingHistory = false;
       });
     } catch (e) {
-      print('❌ History yükleme hatası: $e');
+      print('❌ History Loading Error: $e');
       setState(() => _isLoadingHistory = false);
     }
   }
@@ -81,6 +81,54 @@ class _UploadPageState extends State<UploadPage> {
     if (user == null) return;
 
     try {
+      final movieId = movieInfo['id'];
+
+      // ÖNCELİKLE: Bu film daha önce history'de var mı kontrol et
+      final existingDoc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('upload_history')
+          .where('id', isEqualTo: movieId)
+          .limit(1)
+          .get();
+
+      // Eğer varsa, sadece timestamp'ini güncelle
+      if (existingDoc.docs.isNotEmpty) {
+        final docId = existingDoc.docs.first.id;
+
+        // Firestore'da timestamp güncelle
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('upload_history')
+            .doc(docId)
+            .update({'timestamp': FieldValue.serverTimestamp()});
+
+        // Local history'de de en üste taşı
+        setState(() {
+          // Önce eski kaydı bul ve çıkar
+          final oldIndex = history.indexWhere((m) => m['id'] == movieId);
+          if (oldIndex != -1) {
+            final movie = history.removeAt(oldIndex);
+            // En üste ekle
+            history.insert(0, {...movie, 'docId': docId});
+          }
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${movieInfo['title']} moved to top of history'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+
+        print('✅ Film zaten history\'de, timestamp güncellendi');
+        return;
+      }
+
+      // Eğer yoksa, yeni kayıt ekle
       final docRef = await _firestore
           .collection('users')
           .doc(user.uid)
@@ -93,8 +141,10 @@ class _UploadPageState extends State<UploadPage> {
           history = history.sublist(0, 20);
         }
       });
+
+      print('✅ Yeni film history\'ye eklendi');
     } catch (e) {
-      print('❌ History kaydetme hatası: $e');
+      print('❌ History Save Error: $e');
     }
   }
 
@@ -448,8 +498,9 @@ Be precise. Just give me one line, no extra text.''',
         for (var result in results) {
           double score = 100.0;
 
-          final resultTitle =
-              type == 'movie' ? (result['title'] ?? '') : (result['name'] ?? '');
+          final resultTitle = type == 'movie'
+              ? (result['title'] ?? '')
+              : (result['name'] ?? '');
           final resultYear = type == 'movie'
               ? (result['release_date'] ?? '').split('-').first
               : (result['first_air_date'] ?? '').split('-').first;
@@ -514,8 +565,8 @@ Be precise. Just give me one line, no extra text.''',
                 isPicking
                     ? "Opening gallery..."
                     : _isAnalyzing
-                        ? "Analyzing..."
-                        : "Upload and identify",
+                    ? "Analyzing..."
+                    : "Upload and identify",
               ),
               onPressed: (isPicking || _isAnalyzing) ? null : _pickVideo,
             ),
@@ -567,8 +618,9 @@ Be precise. Just give me one line, no extra text.''',
                           backgroundColor: Colors.black.withOpacity(0.6),
                           child: Icon(
                             isFav ? Icons.favorite : Icons.favorite_border,
-                            color:
-                                isFav ? const Color(0xFF6A0DAD) : Colors.white,
+                            color: isFav
+                                ? const Color(0xFF6A0DAD)
+                                : Colors.white,
                           ),
                         ),
                       );
@@ -687,7 +739,6 @@ Be precise. Just give me one line, no extra text.''',
   }
 }
 
-
 /*import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -695,8 +746,16 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart'; // Provider
+
 import '../services/tmdb_service.dart';
 import 'info_page.dart';
+import 'library_provider.dart'; // SAME folder (pages) -> use this
+// If you will use MovieCard from lib/movie_card.dart elsewhere:
+// import '../movie_card.dart';
+// 🔑 Yolunu proje yapına göre doğrula
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -708,12 +767,15 @@ class UploadPage extends StatefulWidget {
 class _UploadPageState extends State<UploadPage> {
   final picker = ImagePicker();
   late final TMDBService tmdbService;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String status = "No video selected yet.";
   Map<String, dynamic>? movieData;
   List<Map<String, dynamic>> history = [];
   bool isPicking = false;
   bool _isAnalyzing = false;
+  bool _isLoadingHistory = true;
 
   String get apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
   String get tmdbApiKey => dotenv.env['TMDB_API_KEY'] ?? '';
@@ -722,6 +784,129 @@ class _UploadPageState extends State<UploadPage> {
   void initState() {
     super.initState();
     tmdbService = TMDBService();
+    _loadUserHistory();
+  }
+
+  // Firestore'dan kullanıcının upload geçmişini yükle
+  Future<void> _loadUserHistory() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      setState(() => _isLoadingHistory = false);
+      return;
+    }
+
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('upload_history')
+          .orderBy('timestamp', descending: true)
+          .limit(20)
+          .get();
+
+      setState(() {
+        history = querySnapshot.docs
+            .map((doc) => {...doc.data(), 'docId': doc.id})
+            .toList();
+        _isLoadingHistory = false;
+      });
+    } catch (e) {
+      print('❌ History Loading Error: $e');
+      setState(() => _isLoadingHistory = false);
+    }
+  }
+
+  // Yeni sonucu Firestore'a kaydet ve yerel history'ye ekle
+  Future<void> _saveToUserHistory(Map<String, dynamic> movieInfo) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final docRef = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('upload_history')
+          .add({...movieInfo, 'timestamp': FieldValue.serverTimestamp()});
+
+      setState(() {
+        history.insert(0, {...movieInfo, 'docId': docRef.id});
+        if (history.length > 20) {
+          history = history.sublist(0, 20);
+        }
+      });
+    } catch (e) {
+      print('❌ History Save Error: $e');
+    }
+  }
+
+  // History'den bir öğeyi sil
+  Future<void> _deleteFromHistory(int index) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final movie = history[index];
+    final docId = movie['docId'];
+    if (docId == null) return;
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('upload_history')
+          .doc(docId)
+          .delete();
+
+      setState(() {
+        history.removeAt(index);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${movie['title']} deleted from history'),
+            duration: const Duration(seconds: 2),
+            action: SnackBarAction(label: 'OK', onPressed: () {}),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ History silme hatası: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not delete. Please try again.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // Silme onayı diyalogu
+  Future<void> _showDeleteConfirmation(int index) async {
+    final movie = history[index];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete from History?'),
+        content: Text('Remove "${movie['title']}" from your history?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteFromHistory(index);
+    }
   }
 
   Future<String?> _uploadVideoToGemini(
@@ -794,9 +979,7 @@ class _UploadPageState extends State<UploadPage> {
 
     final XFile? file = await picker
         .pickVideo(source: ImageSource.gallery)
-        .catchError((_) {
-          return null;
-        });
+        .catchError((_) => null);
 
     if (!mounted) return;
     if (file == null) {
@@ -875,7 +1058,6 @@ class _UploadPageState extends State<UploadPage> {
         status = 'Analyzing video with AI...';
       });
 
-      // Gemini'den SADECE isim ve tür bilgisi iste
       final modelsToTry = [
         'gemini-2.0-flash',
         'gemini-1.5-flash',
@@ -884,7 +1066,6 @@ class _UploadPageState extends State<UploadPage> {
       String? resultText;
 
       for (final modelName in modelsToTry) {
-        print('📄 Trying model: $modelName');
         final analyzeUrl = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
         );
@@ -926,14 +1107,12 @@ Be precise. Just give me one line, no extra text.''',
           }),
         );
 
-        print('📡 Response status: ${response.statusCode}');
         if (response.statusCode == 200) {
           final jsonResponse = jsonDecode(response.body);
           if (jsonResponse['candidates'] != null &&
               jsonResponse['candidates'].isNotEmpty) {
             resultText =
                 jsonResponse['candidates'][0]['content']['parts'][0]['text'];
-            print('✅ Gemini result: $resultText');
             break;
           }
         } else {
@@ -944,16 +1123,12 @@ Be precise. Just give me one line, no extra text.''',
       await _deleteFileFromGemini(fileNameForModel);
 
       if (resultText != null) {
-        // "Title|Year|Type" formatını parse et
         final parts = resultText.trim().split('|');
         if (parts.length >= 3) {
           final title = parts[0].trim();
           final year = parts[1].trim();
           final type = parts[2].trim().toLowerCase();
 
-          print('🎬 Parsed: Title=$title, Year=$year, Type=$type');
-
-          // TMDB'de ara
           setState(() {
             status = 'Searching in TMDB database...';
           });
@@ -963,16 +1138,15 @@ Be precise. Just give me one line, no extra text.''',
           if (movieInfo != null) {
             setState(() {
               movieData = movieInfo;
-              history.add(movieInfo);
               status = 'Successfully identified!';
             });
+            await _saveToUserHistory(movieInfo);
           } else {
             setState(() {
               status = 'Could not find in TMDB: $title ($year)';
             });
           }
         } else {
-          print('❌ Invalid format: $resultText');
           setState(() {
             status = 'Invalid response format from AI';
           });
@@ -987,13 +1161,11 @@ Be precise. Just give me one line, no extra text.''',
       setState(() {
         status = 'Error: $e';
       });
-      print('❌ Exception: $e');
     } finally {
       setState(() => _isAnalyzing = false);
     }
   }
 
-  // TMDB'de isim ve yıla göre ara, en iyi eşleşmeyi bul
   Future<Map<String, dynamic>?> _searchInTMDB(
     String title,
     String year,
@@ -1009,17 +1181,13 @@ Be precise. Just give me one line, no extra text.''',
         final data = jsonDecode(response.body);
         final results = data['results'] as List;
 
-        if (results.isEmpty) {
-          print('❌ No results found for: $title');
-          return null;
-        }
+        if (results.isEmpty) return null;
 
-        // En iyi eşleşmeyi bul
         Map<String, dynamic>? bestMatch;
         double bestScore = 0;
 
         for (var result in results) {
-          double score = 100.0; // Başlangıç skoru
+          double score = 100.0;
 
           final resultTitle = type == 'movie'
               ? (result['title'] ?? '')
@@ -1028,27 +1196,22 @@ Be precise. Just give me one line, no extra text.''',
               ? (result['release_date'] ?? '').split('-').first
               : (result['first_air_date'] ?? '').split('-').first;
 
-          // İsim benzerliği kontrolü (basit)
           if (resultTitle.toLowerCase() != title.toLowerCase()) {
             score -= 20;
           }
 
-          // Yıl kontrolü
           if (resultYear.isNotEmpty && year.isNotEmpty) {
             final yearDiff =
                 (int.tryParse(resultYear) ?? 0) - (int.tryParse(year) ?? 0);
             if (yearDiff.abs() > 2) {
               score -= 30;
             } else if (yearDiff.abs() == 0) {
-              score += 50; // Tam eşleşme bonusu
+              score += 50;
             }
           }
 
-          // Popülerlik bonusu
           final popularity = (result['popularity'] ?? 0).toDouble();
           score += popularity / 10;
-
-          print('📊 $resultTitle ($resultYear) - Score: $score');
 
           if (score > bestScore) {
             bestScore = score;
@@ -1057,10 +1220,6 @@ Be precise. Just give me one line, no extra text.''',
         }
 
         if (bestMatch != null) {
-          print(
-            '🎯 Best match: ${type == 'movie' ? bestMatch['title'] : bestMatch['name']} (Score: $bestScore)',
-          );
-
           return {
             'id': bestMatch['id'],
             'title': type == 'movie' ? bestMatch['title'] : bestMatch['name'],
@@ -1068,7 +1227,9 @@ Be precise. Just give me one line, no extra text.''',
             'poster': bestMatch['poster_path'] != null
                 ? 'https://image.tmdb.org/t/p/w500${bestMatch['poster_path']}'
                 : null,
-            'rating': bestMatch['vote_average']?.toStringAsFixed(1) ?? 'N/A',
+            'rating': (bestMatch['vote_average'] is num)
+                ? (bestMatch['vote_average'] as num).toStringAsFixed(1)
+                : 'N/A',
             'year': type == 'movie'
                 ? (bestMatch['release_date'] ?? '').split('-').first
                 : (bestMatch['first_air_date'] ?? '').split('-').first,
@@ -1088,16 +1249,18 @@ Be precise. Just give me one line, no extra text.''',
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          ElevatedButton.icon(
-            icon: const Icon(Icons.upload),
-            label: Text(
-              isPicking
-                  ? "Opening gallery..."
-                  : _isAnalyzing
-                  ? "Analyzing..."
-                  : "Upload and identify",
+          Center(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.upload),
+              label: Text(
+                isPicking
+                    ? "Opening gallery..."
+                    : _isAnalyzing
+                    ? "Analyzing..."
+                    : "Upload and identify",
+              ),
+              onPressed: (isPicking || _isAnalyzing) ? null : _pickVideo,
             ),
-            onPressed: (isPicking || _isAnalyzing) ? null : _pickVideo,
           ),
           const SizedBox(height: 20),
           Text(
@@ -1107,17 +1270,55 @@ Be precise. Just give me one line, no extra text.''',
           ),
           if (_isAnalyzing) const SizedBox(height: 20),
           if (_isAnalyzing) const CircularProgressIndicator(),
+
+          // Poster + sağ üstte kalp
           if (movieData != null) ...[
             const SizedBox(height: 20),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                movieData!['poster'] ?? '',
-                height: 250,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.broken_image, size: 100),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    movieData!['poster'] ?? '',
+                    height: 250,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.broken_image, size: 100),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Consumer<LibraryProvider>(
+                    builder: (context, libraryProvider, _) {
+                      final id = movieData!['id'] as int;
+                      final isFav = libraryProvider.isInLibrary(id);
+
+                      return GestureDetector(
+                        onTap: () {
+                          libraryProvider.toggleLibrary({
+                            'id': id,
+                            'title': movieData!['title'],
+                            'poster': movieData!['poster'],
+                            'type': movieData!['type'],
+                            'year': movieData!['year'],
+                            'rating': movieData!['rating'],
+                          });
+                        },
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black.withOpacity(0.6),
+                          child: Icon(
+                            isFav ? Icons.favorite : Icons.favorite_border,
+                            color: isFav
+                                ? const Color(0xFF6A0DAD)
+                                : Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Text(
@@ -1153,7 +1354,13 @@ Be precise. Just give me one line, no extra text.''',
               },
             ),
           ],
-          if (history.isNotEmpty) ...[
+
+          if (_isLoadingHistory)
+            const Padding(
+              padding: EdgeInsets.only(top: 30),
+              child: CircularProgressIndicator(),
+            ),
+          if (!_isLoadingHistory && history.isNotEmpty) ...[
             const SizedBox(height: 30),
             const Text(
               "History",
@@ -1181,18 +1388,23 @@ Be precise. Just give me one line, no extra text.''',
                         ),
                       );
                     },
+                    onLongPress: () => _showDeleteConfirmation(index),
                     child: Column(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            movie['poster'] ?? '',
-                            width: 80,
-                            height: 100,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.broken_image, size: 50),
-                          ),
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                movie['poster'] ?? '',
+                                width: 80,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.broken_image, size: 50),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 5),
                         SizedBox(

@@ -11,14 +11,19 @@ class TMDBService {
   // ===============================
   // 1) SEARCH MULTI (HomePage)
   // ===============================
-  Future<List<Map<String, dynamic>>> searchMulti(String query, {int limit = 8}) async {
+  Future<List<Map<String, dynamic>>> searchMulti(
+    String query, {
+    int limit = 8,
+  }) async {
     if (query.trim().isEmpty) return [];
 
     try {
-      final movieUrl =
-          Uri.parse('$_baseUrl/search/movie?api_key=$_apiKey&query=$query');
-      final tvUrl =
-          Uri.parse('$_baseUrl/search/tv?api_key=$_apiKey&query=$query');
+      final movieUrl = Uri.parse(
+        '$_baseUrl/search/movie?api_key=$_apiKey&query=$query',
+      );
+      final tvUrl = Uri.parse(
+        '$_baseUrl/search/tv?api_key=$_apiKey&query=$query',
+      );
 
       final responses = await Future.wait([
         http.get(movieUrl),
@@ -36,8 +41,7 @@ class TMDBService {
       ];
 
       combined.sort(
-        (a, b) =>
-            (b['popularity'] as num).compareTo(a['popularity'] as num),
+        (a, b) => (b['popularity'] as num).compareTo(a['popularity'] as num),
       );
 
       return combined.take(limit).toList();
@@ -54,7 +58,8 @@ class TMDBService {
 
     try {
       final url = Uri.parse(
-          '$_baseUrl/search/movie?api_key=$_apiKey&query=$query');
+        '$_baseUrl/search/movie?api_key=$_apiKey&query=$query',
+      );
       final res = await http.get(url);
 
       if (res.statusCode != 200) return null;
@@ -128,8 +133,7 @@ class TMDBService {
   // ===============================
   Future<List<Map<String, dynamic>>> fetchCast(int id, String type) async {
     try {
-      final url =
-          Uri.parse('$_baseUrl/$type/$id/credits?api_key=$_apiKey');
+      final url = Uri.parse('$_baseUrl/$type/$id/credits?api_key=$_apiKey');
       final res = await http.get(url);
       if (res.statusCode != 200) return [];
 
@@ -155,8 +159,7 @@ class TMDBService {
   // ===============================
   Future<List<Map<String, dynamic>>> fetchReviews(int id, String type) async {
     try {
-      final url =
-          Uri.parse('$_baseUrl/$type/$id/reviews?api_key=$_apiKey');
+      final url = Uri.parse('$_baseUrl/$type/$id/reviews?api_key=$_apiKey');
       final res = await http.get(url);
       if (res.statusCode != 200) return [];
 
@@ -179,8 +182,7 @@ class TMDBService {
   // ===============================
   Future<String?> fetchTrailer(int id, String type) async {
     try {
-      final url =
-          Uri.parse('$_baseUrl/$type/$id/videos?api_key=$_apiKey');
+      final url = Uri.parse('$_baseUrl/$type/$id/videos?api_key=$_apiKey');
       final res = await http.get(url);
       if (res.statusCode != 200) return null;
 
@@ -205,8 +207,7 @@ class TMDBService {
   // ===============================
   Future<List<Map<String, dynamic>>> fetchSimilar(int id, String type) async {
     try {
-      final url =
-          Uri.parse('$_baseUrl/$type/$id/similar?api_key=$_apiKey');
+      final url = Uri.parse('$_baseUrl/$type/$id/similar?api_key=$_apiKey');
       final res = await http.get(url);
       if (res.statusCode != 200) return [];
 
@@ -234,7 +235,50 @@ class TMDBService {
   // ===============================
   // 8) TRENDING
   // ===============================
+
   Future<List<Map<String, dynamic>>> fetchTrending() async {
+    try {
+      List<Map<String, dynamic>> allResults = [];
+
+      // İlk 3 sayfayı çekiyoruz (20+20+20 = 60 sonuç)
+      for (int page = 1; page <= 3; page++) {
+        final url = Uri.parse(
+          '$_baseUrl/trending/all/week?api_key=$_apiKey&page=$page',
+        );
+        final res = await http.get(url);
+
+        if (res.statusCode != 200) continue;
+
+        final data = jsonDecode(res.body);
+        final results = data['results'] as List<dynamic>? ?? [];
+
+        allResults.addAll(
+          results.map((m) {
+            return {
+              'id': m['id'],
+              'title': m['title'] ?? m['name'] ?? 'Unknown',
+              'poster': m['poster_path'] != null
+                  ? '$_imageBase${m['poster_path']}'
+                  : '',
+              'rating': (m['vote_average'] ?? 0).toString(),
+              'year': (m['release_date'] ?? m['first_air_date'] ?? '')
+                  .toString()
+                  .split('-')
+                  .first,
+              'type': m['media_type'] == 'tv' ? 'tv' : 'movie',
+            };
+          }),
+        );
+      }
+
+      // Sadece ilk 50 sonucu döndür
+      return allResults.take(50).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /*Future<List<Map<String, dynamic>>> fetchTrending() async {
     try {
       final url =
           Uri.parse('$_baseUrl/trending/all/week?api_key=$_apiKey');
@@ -262,5 +306,5 @@ class TMDBService {
     } catch (e) {
       return [];
     }
-  }
+  }*/
 }
