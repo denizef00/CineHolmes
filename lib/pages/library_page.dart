@@ -88,10 +88,10 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.52,
+        crossAxisCount: 2,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 0.58,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
@@ -203,7 +203,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                '${item['rating'] ?? 'N/A'}  •  ${item['year'] ?? ''}  ',
+                                '${item['rating'] ?? 'N/A'}  •  ${item['year'] ?? ''}  •  ${item['type'] == 'tv' ? 'TV' : 'Movie'}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -214,15 +214,6 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
                             ),
                           ],
                         ),
-                        // ${item['type'] == 'tv' ? 'TV Show' : 'Movie'}
-                        const SizedBox(height: 2),
-                        Text(
-                          item['type'] == 'tv' ? 'TV Show' : 'Movie',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white38,
-                            ),
-                          ),
                       ],
                     ),
                   ),
