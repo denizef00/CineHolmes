@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../home_main.dart';
-import 'signup_page.dart';
-import '../services/auth_service.dart'; //  YENI EKLEME
+import '../services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
@@ -15,7 +14,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService(); // YENI EKLEME
+  final _authService = AuthService();
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -49,51 +48,15 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // 👇 YENİ FONKSİYONLAR - GOOGLE
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
     try {
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null && mounted) {
-        // AuthWrapper otomatik olarak home'a yönlendirecek
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = e.toString();
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // 👇 YENİ FONKSİYONLAR - FACEBOOK
-  Future<void> _handleFacebookSignIn() async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential = await _authService.signInWithFacebook();
-      if (userCredential != null && mounted) {
-        // AuthWrapper otomatik olarak home'a yönlendirecek
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = e.toString();
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // 👇 YENİ FONKSİYONLAR - APPLE
-  Future<void> _handleAppleSignIn() async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential = await _authService.signInWithApple();
-      if (userCredential != null && mounted) {
-        // AuthWrapper otomatik olarak home'a yönlendirecek
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CineHolmesApp()),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -124,11 +87,11 @@ class _LoginPageState extends State<LoginPage> {
         ),
         child: Center(
           child: Container(
-            padding: const EdgeInsets.all(24),
-            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(20), // 🔧 daha küçük padding
+            margin: const EdgeInsets.symmetric(horizontal: 40), // 🔧 kutu daraldı
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16), // 🔧 daha küçük radius
               border: Border.all(color: Colors.white24),
             ),
             child: Column(
@@ -138,11 +101,11 @@ class _LoginPageState extends State<LoginPage> {
                   "Login",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
+                    fontSize: 24, // 🔧 biraz küçültüldü
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _emailController,
                   style: const TextStyle(color: Colors.white),
@@ -152,119 +115,98 @@ class _LoginPageState extends State<LoginPage> {
                     filled: true,
                     fillColor: Colors.white12,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) {
-                    _login();
-                  },
+                  onSubmitted: (_) => _login(),
                   decoration: InputDecoration(
                     labelText: "Password",
                     labelStyle: const TextStyle(color: Colors.white70),
                     filled: true,
                     fillColor: Colors.white12,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
-                CheckboxListTile(
-                  title: const Text(
-                    "Remember Me",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  value: _rememberMe,
-                  onChanged: (value) {
-                    setState(() {
-                      _rememberMe = value ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: Colors.deepPurpleAccent,
-                  checkColor: Colors.white,
+                const SizedBox(height: 10),
+
+                // 🔧 İnce Remember Me
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (val) =>
+                          setState(() => _rememberMe = val ?? false),
+                      activeColor: Colors.deepPurpleAccent,
+                      checkColor: Colors.white,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact, // daha ince
+                    ),
+                    const Text(
+                      "Remember Me",
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
+
+                const SizedBox(height: 16),
 
                 if (_errorMessage != null)
                   Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent),
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
                   ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
+
                 ElevatedButton(
                   onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurpleAccent.shade100,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 50,
-                      vertical: 14,
+                      horizontal: 40,
+                      vertical: 12,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
                           "Sign In",
-                          style: TextStyle(fontSize: 18, color: Colors.white),
+                          style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
                 ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SignUpPage(),
+                const SizedBox(height: 24),
+
+                // 🔥 Google Sign-In butonu
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _handleGoogleSignIn,
+                    icon: const Icon(Icons.g_mobiledata,
+                        color: Colors.white, size: 26),
+                    label: const Text(
+                      "Continue with Google",
+                      style: TextStyle(fontSize: 15, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A0DAD),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    );
-                  },
-                  child: const Text(
-                    "Don’t have an account? Sign up",
-                    style: TextStyle(color: Colors.white70),
+                      elevation: 0,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: _isLoading ? null : _handleGoogleSignIn,
-                      child: const Icon(
-                        Icons.g_mobiledata,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Facebook butonu
-                    GestureDetector(
-                      onTap: _isLoading ? null : _handleFacebookSignIn,
-                      child: const Icon(
-                        Icons.facebook,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Apple butonu
-                    GestureDetector(
-                      onTap: _isLoading ? null : _handleAppleSignIn,
-                      child: const Icon(
-                        Icons.apple,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
