@@ -8,11 +8,11 @@ class MovieCard extends StatefulWidget {
   final String title; // 🎬 Ek: başlık da kaydedelim
 
   const MovieCard({
-    Key? key,
+    super.key,
     required this.posterUrl,
     required this.movieId,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   _MovieCardState createState() => _MovieCardState();

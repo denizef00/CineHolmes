@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 📋 Email kopyalamak için
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cineholmes/screens/login_page.dart';
-import '../services/auth_service.dart'; // 👈 AuthService import edildi
+import '../services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,9 +12,10 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool _obscurePassword = true;
   User? _currentUser;
-  final AuthService _authService = AuthService(); // 👈 AuthService eklendi
+  final AuthService _authService = AuthService();
+
+  bool _loading = true; // 🔹 Yüklenme durumu
 
   @override
   void initState() {
@@ -22,33 +24,25 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserData() async {
-    // Firebase'den güncel kullanıcıyı çek
     final user = FirebaseAuth.instance.currentUser;
-    await user?.reload(); // Firebase'den yenile
+    await user?.reload();
 
     setState(() {
       _currentUser = FirebaseAuth.instance.currentUser;
+      _loading = false;
     });
   }
 
-  // 👇 Firebase'den email al
   String get email => _currentUser?.email ?? "Email not found.";
 
-  // 👇 Firebase'den kullanıcı adı al
   String get username {
-    // Display name varsa onu kullan
     if (_currentUser?.displayName != null &&
         _currentUser!.displayName!.isNotEmpty) {
       return _currentUser!.displayName!;
     }
-    // Yoksa email'in @ öncesi kısmını kullan
     return _currentUser?.email?.split('@')[0] ?? "User";
   }
 
-  // 👇 Şifre (Firebase şifre döndürmez, placeholder)
-  String get password => "••••••••";
-
-  // Giriş yöntemi kontrolü
   bool get isEmailPasswordUser {
     if (_currentUser == null) return false;
     return _currentUser!.providerData.any(
@@ -58,73 +52,65 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_currentUser == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.person_off, size: 60),
+              const SizedBox(height: 12),
+              const Text(
+                "No user is currently logged in.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => LoginPage()),
+                    (route) => false,
+                  );
+                },
+                child: const Text("Go to Login"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Profil fotoğrafı
-          CircleAvatar(
-            radius: 50,
-            backgroundImage: _currentUser?.photoURL != null
-                ? NetworkImage(_currentUser!.photoURL!)
-                : null,
-            child: _currentUser?.photoURL == null
-                ? const Icon(Icons.person, size: 50)
-                : null,
-          ),
-          const SizedBox(height: 20),
+          // 🔹 HEADER (gradient + avatar + username + email + chip)
+          _buildProfileHeader(theme),
 
-          // Mail
-          ListTile(leading: const Icon(Icons.email), title: Text(email)),
+          const SizedBox(height: 24),
 
-          // Username
-          ListTile(
-            leading: const Icon(Icons.person),
-            title: Text(username),
-            trailing: IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: _showChangeUsernameDialog,
-            ),
-          ),
+          // 🔹 ACCOUNT CARD
+          _buildAccountCard(theme),
 
-          // Şifre (sadece email/password kullanıcıları için)
-          if (isEmailPasswordUser)
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: GestureDetector(
-                onTap: _showChangePasswordDialog,
-                child: Text(
-                  _obscurePassword ? "••••••••" : password,
-                  style: const TextStyle(letterSpacing: 2),
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: _showChangePasswordDialog,
-                  ),
-                ],
-              ),
-            ),
+          const SizedBox(height: 16),
 
-          // Eğer Google/Facebook/Apple ile giriş yaptıysa bilgi göster
-          if (!isEmailPasswordUser)
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text(
-                'You have successfully logged in with social media.',
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
-              ),
-            ),
+          // 🔹 SECURITY CARD
+          _buildSecurityCard(theme),
 
           const SizedBox(height: 30),
 
-          // 👇 LOGOUT BUTONU
+          // 🔹 LOGOUT BUTTON
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ElevatedButton.icon(
               onPressed: _handleLogout,
               icon: const Icon(Icons.logout),
@@ -139,13 +125,259 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
         ],
       ),
     );
   }
 
-  // 👇 LOGOUT FONKSİYONU
+  // 🔹 HEADER
+  Widget _buildProfileHeader(ThemeData theme) {
+    final gradientColors = [
+      const Color(0xFF6A0DAD),
+      const Color(0xFF9D4EDD),
+    ];
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.first.withOpacity(0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withOpacity(0.4),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 34,
+              backgroundImage: _currentUser?.photoURL != null
+                  ? NetworkImage(_currentUser!.photoURL!)
+                  : null,
+              backgroundColor: Colors.white.withOpacity(0.1),
+              child: _currentUser?.photoURL == null
+                  ? const Icon(Icons.person, size: 34, color: Colors.white)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 16),
+          // İsim + email + chip
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  username,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.85),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Chip(
+                      label: Text(
+                        isEmailPasswordUser
+                            ? 'Email & Password'
+                            : 'Social Login',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                      backgroundColor: Colors.white.withOpacity(0.15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔹 ACCOUNT CARD
+  Widget _buildAccountCard(ThemeData theme) {
+    final cardColor =
+        theme.colorScheme.surface.withOpacity(theme.brightness == Brightness.dark ? 0.9 : 1.0);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withOpacity(
+            theme.brightness == Brightness.dark ? 0.05 : 0.08,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(
+              theme.brightness == Brightness.dark ? 0.4 : 0.1,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Text(
+              "Account",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const Divider(height: 8),
+
+          // Email Row
+          ListTile(
+            leading: const Icon(Icons.email_outlined),
+            title: const Text("Email"),
+            subtitle: Text(email),
+            trailing: IconButton(
+              icon: const Icon(Icons.copy, size: 20),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: email));
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Email copied to clipboard."),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+
+          // Username Row
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text("Username"),
+            subtitle: Text(username),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: _showChangeUsernameDialog,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔹 SECURITY CARD
+  Widget _buildSecurityCard(ThemeData theme) {
+    final cardColor =
+        theme.colorScheme.surface.withOpacity(theme.brightness == Brightness.dark ? 0.9 : 1.0);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withOpacity(
+            theme.brightness == Brightness.dark ? 0.05 : 0.08,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(
+              theme.brightness == Brightness.dark ? 0.4 : 0.1,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Text(
+              "Security",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const Divider(height: 8),
+
+          if (isEmailPasswordUser)
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text("Change Password"),
+              subtitle:
+                  const Text("Update your account password securely."),
+              onTap: _showChangePasswordDialog,
+              trailing: const Icon(Icons.chevron_right),
+            )
+          else
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text("Password Managed Externally"),
+              subtitle: const Text(
+                "You signed in with a social provider. Please manage your password from your Google / Apple / provider account.",
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 🔹 LOGOUT
   Future<void> _handleLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -178,12 +410,11 @@ class _ProfilePageState extends State<ProfilePage> {
             const SnackBar(content: Text('Successfully logged out.')),
           );
 
-          // 🔴 Burada login sayfasına yönlendirme yapıyoruz
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
               builder: (context) => LoginPage(),
-            ), // giriş ekranının adı
+            ),
             (route) => false,
           );
         }
@@ -197,7 +428,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // 👇 Kullanıcı adı değiştirme
+  // 🔹 USERNAME DİYALOĞU
   void _showChangeUsernameDialog() {
     String newUsername = username;
     final controller = TextEditingController(text: username);
@@ -221,14 +452,9 @@ class _ProfilePageState extends State<ProfilePage> {
           ElevatedButton(
             onPressed: () async {
               if (newUsername.isNotEmpty && newUsername != username) {
-                // Dialogu kapat
                 Navigator.pop(context);
-
                 try {
-                  // Firebase'de display name güncelle
                   await _currentUser?.updateDisplayName(newUsername);
-
-                  // Kullanıcıyı yeniden yükle
                   await _loadUserData();
 
                   if (mounted) {
@@ -254,7 +480,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // 👇 Şifre değiştirme (sadece email/password kullanıcıları için)
+  // 🔹 PASSWORD DİYALOĞU
   void _showChangePasswordDialog() {
     if (!isEmailPasswordUser) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -340,14 +566,11 @@ class _ProfilePageState extends State<ProfilePage> {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 try {
-                  // 1. Kullanıcıyı mevcut şifresiyle yeniden doğrula
                   final credential = EmailAuthProvider.credential(
                     email: email,
                     password: currentPassword,
                   );
                   await _currentUser?.reauthenticateWithCredential(credential);
-
-                  // 2. Yeni şifreyi güncelle
                   await _currentUser?.updatePassword(newPassword);
 
                   if (mounted) {

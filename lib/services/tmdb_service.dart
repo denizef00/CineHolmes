@@ -5,11 +5,13 @@ import '../config.dart';
 class TMDBService {
   final String _baseUrl = 'https://api.themoviedb.org/3';
   final String _imageBase = 'https://image.tmdb.org/t/p/w500';
+  // Backdrop için biraz daha geniş versiyon
+  final String _backdropBase = 'https://image.tmdb.org/t/p/w780';
 
   String get _apiKey => Config.tmdbApiKey;
 
   // ===============================
-  // 1) SEARCH MULTI (HomePage)
+  // 1) SEARCH MULTI (HomePage arama)
   // ===============================
   Future<List<Map<String, dynamic>>> searchMulti(
     String query, {
@@ -45,13 +47,13 @@ class TMDBService {
       );
 
       return combined.take(limit).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
 
   // ===============================
-  // 2) SEARCH MOVIE (Sadece Film)
+  // 2) SEARCH MOVIE (sadece film)
   // ===============================
   Future<Map<String, dynamic>?> searchMovie(String query) async {
     if (query.trim().isEmpty) return null;
@@ -67,9 +69,8 @@ class TMDBService {
       final results = jsonDecode(res.body)['results'] as List<dynamic>? ?? [];
       if (results.isEmpty) return null;
 
-      // İlk sonucu alıyoruz
       return _mapSearchItem(results[0], 'movie');
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -111,6 +112,10 @@ class TMDBService {
         'poster': data['poster_path'] != null
             ? '$_imageBase${data['poster_path']}'
             : '',
+        // Filmden kare / backdrop
+        'backdrop': data['backdrop_path'] != null
+            ? '$_backdropBase${data['backdrop_path']}'
+            : '',
         'year': (data['release_date'] ?? data['first_air_date'] ?? '')
             .toString()
             .split('-')
@@ -123,7 +128,7 @@ class TMDBService {
         'number_of_seasons': data['number_of_seasons'], // tv
         'type': type,
       };
-    } catch (e) {
+    } catch (_) {
       return {};
     }
   }
@@ -149,7 +154,7 @@ class TMDBService {
               : '',
         };
       }).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
@@ -172,7 +177,7 @@ class TMDBService {
           'content': r['content'] ?? '',
         };
       }).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
@@ -197,7 +202,7 @@ class TMDBService {
       if (yt == null) return null;
 
       return 'https://www.youtube.com/watch?v=${yt['key']}';
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -227,18 +232,17 @@ class TMDBService {
               : type,
         };
       }).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
 
   // ===============================
-  // 8) TRENDING
+  // 8) TRENDING (HomePage grid)
   // ===============================
-
   Future<List<Map<String, dynamic>>> fetchTrending() async {
     try {
-      List<Map<String, dynamic>> allResults = [];
+      final List<Map<String, dynamic>> allResults = [];
 
       // İlk 3 sayfayı çekiyoruz (20+20+20 = 60 sonuç)
       for (int page = 1; page <= 3; page++) {
@@ -273,38 +277,8 @@ class TMDBService {
 
       // Sadece ilk 50 sonucu döndür
       return allResults.take(50).toList();
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
-
-  /*Future<List<Map<String, dynamic>>> fetchTrending() async {
-    try {
-      final url =
-          Uri.parse('$_baseUrl/trending/all/week?api_key=$_apiKey');
-      final res = await http.get(url);
-      if (res.statusCode != 200) return [];
-
-      final data = jsonDecode(res.body);
-      final results = data['results'] as List<dynamic>? ?? [];
-
-      return results.map((m) {
-        return {
-          'id': m['id'],
-          'title': m['title'] ?? m['name'] ?? 'Unknown',
-          'poster': m['poster_path'] != null
-              ? '$_imageBase${m['poster_path']}'
-              : '',
-          'rating': (m['vote_average'] ?? 0).toString(),
-          'year': (m['release_date'] ?? m['first_air_date'] ?? '')
-              .toString()
-              .split('-')
-              .first,
-          'type': m['media_type'] == 'tv' ? 'tv' : 'movie',
-        };
-      }).toList();
-    } catch (e) {
-      return [];
-    }
-  }*/
 }

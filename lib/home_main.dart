@@ -39,6 +39,7 @@ class CineHolmesApp extends StatelessWidget {
                       backgroundColor: Color(0xFF1E1E2C),
                       foregroundColor: Colors.white,
                       centerTitle: true,
+                      elevation: 0,
                     ),
                     bottomNavigationBarTheme: BottomNavigationBarThemeData(
                       backgroundColor: const Color(0xFF1E1E2C),
@@ -52,12 +53,13 @@ class CineHolmesApp extends StatelessWidget {
                       backgroundColor: Colors.deepPurple,
                       foregroundColor: Colors.white,
                       centerTitle: true,
+                      elevation: 0,
                     ),
                     bottomNavigationBarTheme:
                         const BottomNavigationBarThemeData(
-                          selectedItemColor: Colors.deepPurple,
-                          unselectedItemColor: Colors.grey,
-                        ),
+                      selectedItemColor: Colors.deepPurple,
+                      unselectedItemColor: Colors.grey,
+                    ),
                   ),
             home: const HomeScreen(),
           );
@@ -94,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('CineHolmes ')),
+      // Artık her sayfa kendi AppBar'ını çiziyor (HomePage'de CineHolmes + Tabs var)
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,

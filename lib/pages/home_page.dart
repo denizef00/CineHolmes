@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+
 import '../services/tmdb_service.dart';
 import 'info_page.dart';
-import 'library_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,14 +13,18 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final tmdb = TMDBService();
-  final TextEditingController _searchCtrl = TextEditingController();
 
-  bool _loadingTrending = true;
-  List<Map<String, dynamic>> _trending = [];
+  bool _loading = true;
+  int _currentTabIndex = 0; // 0 = Films, 1 = TV Shows
 
-  List<Map<String, dynamic>> _searchResults = [];
-  bool _searching = false;
+  List<Map<String, dynamic>> _movies = [];
+  List<Map<String, dynamic>> _tvShows = [];
+
+  // --- Search state ---
+  final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
+  bool _searching = false;
+  List<Map<String, dynamic>> _searchResults = [];
 
   @override
   void initState() {
@@ -31,44 +34,75 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
     _debounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _loadTrending() async {
-    final data = await tmdb.fetchTrending();
+    final data = await tmdb.fetchTrending(); // movie + tv karışık
     if (!mounted) return;
+
+    final movies = <Map<String, dynamic>>[];
+    final tvs = <Map<String, dynamic>>[];
+
+    for (final item in data) {
+      final type = (item['type'] ?? '').toString();
+      if (type == 'movie') {
+        movies.add(item);
+      } else if (type == 'tv') {
+        tvs.add(item);
+      }
+    }
+
     setState(() {
-      _trending = data;
-      _loadingTrending = false;
+      _movies = movies;
+      _tvShows = tvs;
+      _loading = false;
     });
   }
 
+  // --- Search logic ---
+
   void _onSearchChanged(String value) {
-    final text = value.trim();
-    if (text.isEmpty) {
+    final query = value.trim();
+
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _performSearch(query);
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (!mounted) return;
+
+    if (query.isEmpty) {
       setState(() {
-        _searchResults = [];
         _searching = false;
+        _searchResults = [];
       });
       return;
     }
 
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () async {
-      setState(() => _searching = true);
-      final results = await tmdb.searchMulti(text);
-      if (!mounted) return;
-      setState(() {
-        _searchResults = results;
-        _searching = false;
-      });
+    setState(() {
+      _searching = true;
+    });
+
+    final all = await tmdb.searchMulti(query, limit: 30);
+    if (!mounted) return;
+
+    final wantedType = _currentTabIndex == 0 ? 'movie' : 'tv';
+    final filtered =
+        all.where((m) => (m['type'] ?? '') == wantedType).toList();
+
+    setState(() {
+      _searchResults = filtered;
+      _searching = false;
     });
   }
 
   void _clearSearch() {
-    _searchCtrl.clear();
+    _searchController.clear();
     setState(() {
       _searchResults = [];
       _searching = false;
@@ -77,262 +111,328 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool showingSearch =
-        _searchCtrl.text.trim().isNotEmpty && _searchResults.isNotEmpty;
-
-    return Scaffold(
-      body: Column(
+    return DefaultTabController(
+      length: 2,
+      initialIndex: _currentTabIndex,
+      child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search movies / TV shows...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: _clearSearch,
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+          // ÜST SİYAH HEADER (CineHolmes + TabBar)
+          Container(
+            color: Colors.black,
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top, // status bar
+              bottom: 8,
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 6),
+                const Text(
+                  'CineHolmes',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                TabBar(
+                  onTap: (index) {
+                    setState(() {
+                      _currentTabIndex = index;
+                    });
+                    final q = _searchController.text.trim();
+                    if (q.isNotEmpty) {
+                      _performSearch(q);
+                    }
+                  },
+                  tabs: const [
+                    Tab(text: 'Films'),
+                    Tab(text: 'TV Shows'),
+                  ],
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  labelStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                  indicatorSize: TabBarIndicatorSize.label,
+                  indicator: const UnderlineTabIndicator(
+                    borderSide: BorderSide(
+                      width: 3,
+                      color: Color(0xFF00D474), // yeşil çizgi
+                    ),
+                    insets: EdgeInsets.symmetric(horizontal: 24),
+                  ),
+                  dividerColor: Colors.transparent,
+                ),
+              ],
             ),
           ),
-          if (_searching) const LinearProgressIndicator(minHeight: 2),
+
+          // ALTTAKİ KOYU GRİ ALAN
           Expanded(
-            child: showingSearch ? _buildSearchList() : _buildTrendingGrid(),
+            child: Container(
+              color: const Color(0xFF202227), // gri arka plan
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadTrending,
+                      child: _buildScrollableContent(),
+                    ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTrendingGrid() {
-    if (_loadingTrending) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _buildScrollableContent() {
+    final items = _currentTabIndex == 0 ? _movies : _tvShows;
+    final hintText =
+        _currentTabIndex == 0 ? 'Search films' : 'Search TV shows';
+    final isSearching = _searchController.text.trim().isNotEmpty;
 
-    if (_trending.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadTrending,
-        child: ListView(
-          children: const [
-            SizedBox(height: 200),
-            Center(child: Text('No trending titles right now.')),
-          ],
-        ),
-      );
-    }
-
-    final libraryProvider = Provider.of<LibraryProvider>(context);
-
-    return RefreshIndicator(
-      onRefresh: _loadTrending,
-      child: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _trending.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.58, // Daha uzun yaparak alt metin için alan açtık
-        ),
-        itemBuilder: (context, index) {
-          final item = _trending[index];
-          final poster = item['poster'] as String? ?? '';
-          final id = item['id'] as int;
-          final isFav = libraryProvider.isInLibrary(id);
-
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => InfoPage(
-                    id: item['id'],
-                    title: item['title'],
-                    type: item['type'] ?? 'movie',
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      children: [
+        // Search bar
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF2A2C31),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    border: InputBorder.none,
                   ),
                 ),
-              );
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E2C),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(2, 2),
-                  ),
-                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Poster alanı - Expanded kullanarak esnek yap
-                  Expanded(
-                    flex: 7, // Poster için daha fazla alan
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(14),
-                            ),
-                            child: poster.isNotEmpty
-                                ? Image.network(
-                                    poster,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.grey.shade800,
-                                      child: const Icon(
-                                        Icons.broken_image,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : Container(
-                                    color: Colors.grey.shade800,
-                                    child: const Icon(
-                                      Icons.broken_image,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                          ),
+              if (_searchController.text.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18, color: Colors.white60),
+                  onPressed: _clearSearch,
+                  splashRadius: 18,
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        if (isSearching) ...[
+          // SEARCH MODE
+          if (_searching)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_searchResults.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 24),
+              child: Center(
+                child: Text(
+                  'No results found.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Results',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ..._searchResults.map(_buildSearchTile),
+              ],
+            ),
+        ] else ...[
+          // TRENDING MODE
+          const Text(
+            'Popular this week',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 40.0),
+              child: Center(
+                child: Text(
+                  'No titles found for this week.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+              itemCount: items.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.66,
+              ),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final poster = item['poster'] as String? ?? '';
+
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => InfoPage(
+                          id: item['id'],
+                          title: item['title'],
+                          type: item['type'] ?? 'movie',
                         ),
-                        // Kalp ikonu - sağ üstte sabit
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () {
-                              if (isFav) {
-                                libraryProvider.removeFromLibrary(id);
-                              } else {
-                                libraryProvider.addToLibrary({
-                                  'id': id,
-                                  'title': item['title'],
-                                  'poster': item['poster'],
-                                  'type': item['type'],
-                                  'year': item['year'],
-                                  'rating': item['rating'],
-                                });
-                              }
-                            },
-                            child: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Colors.black.withOpacity(0.6),
-                              child: Icon(
-                                isFav ? Icons.favorite : Icons.favorite_border,
-                                color: isFav
-                                    ? const Color(0xFF6A0DAD)
-                                    : Colors.white,
-                                size: 20,
+                      ),
+                    );
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: poster.isNotEmpty
+                        ? Image.network(
+                            poster,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey.shade800,
+                              child: const Icon(
+                                Icons.broken_image,
+                                color: Colors.white54,
+                                size: 24,
                               ),
                             ),
+                          )
+                        : Container(
+                            color: Colors.grey.shade800,
+                            child: const Icon(
+                              Icons.movie,
+                              color: Colors.white54,
+                              size: 24,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
                   ),
-                  // Alt bilgiler - Expanded ile esnek alan
-                  Expanded(
-                    flex: 2, // Alt bilgiler için yeterli alan
-                    child: Container(
-                      padding: const EdgeInsets.all(10.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['title'] ?? '',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '⭐ ${item['rating'] ?? 'N/A'}  •  ${item['year'] ?? ''}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item['type'] == 'tv' ? 'TV Show' : 'Movie',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white38,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-          );
-        },
-      ),
+        ],
+      ],
     );
   }
 
-  Widget _buildSearchList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(10),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final item = _searchResults[index];
-        return ListTile(
-          leading:
-              item['poster'] != null && item['poster'].toString().isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
-                    item['poster'],
-                    width: 50,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.broken_image),
-                  ),
-                )
-              : const Icon(Icons.movie),
-          title: Text(
-            item['title'] ?? '',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+  // Letterboxd tarzı search sonucu satırı
+  Widget _buildSearchTile(Map<String, dynamic> item) {
+    final poster = item['poster'] as String? ?? '';
+    final title = (item['title'] ?? '') as String;
+    final year = (item['year'] ?? '').toString();
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => InfoPage(
+              id: item['id'],
+              title: title,
+              type: item['type'] ?? 'movie',
+            ),
           ),
-          subtitle: Text(
-            '${item['type'] == 'tv' ? 'TV Show' : 'Movie'} • ${item['year'] ?? ''}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => InfoPage(
-                  id: item['id'],
-                  title: item['title'],
-                  type: item['type'] ?? 'movie',
-                ),
-              ),
-            );
-          },
         );
       },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: 52,
+                height: 78,
+                child: poster.isNotEmpty
+                    ? Image.network(
+                        poster,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey.shade800,
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.white54,
+                            size: 20,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.grey.shade800,
+                        child: const Icon(
+                          Icons.movie,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  if (year.isNotEmpty)
+                    Text(
+                      year,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
