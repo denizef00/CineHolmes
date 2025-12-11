@@ -10,6 +10,67 @@ class TMDBService {
 
   String get _apiKey => Config.tmdbApiKey;
 
+  // 🔹 Yönetmen / creator için basit cache
+  final Map<String, String> _creditsCache = {};
+
+  // --------------------------------------------------
+  //  Yalnızca yönetmen / creator bilgisini çeken helper
+  //  (title satırında "2023, directed by X" gibi göstermek için)
+  // --------------------------------------------------
+  Future<String?> fetchDirectorOrCreator(int id, String type) async {
+    final cacheKey = '$type-$id';
+    if (_creditsCache.containsKey(cacheKey)) {
+      return _creditsCache[cacheKey];
+    }
+
+    try {
+      if (type == 'movie') {
+        // Film için /movie/{id}/credits → crew içinden Director
+        final url = Uri.parse(
+          '$_baseUrl/movie/$id/credits?api_key=$_apiKey',
+        );
+        final res = await http.get(url);
+        if (res.statusCode != 200) return null;
+
+        final data = jsonDecode(res.body);
+        final crew = data['crew'] as List<dynamic>? ?? [];
+
+        final dir = crew.firstWhere(
+          (c) => c['job'] == 'Director',
+          orElse: () => null,
+        );
+
+        if (dir != null) {
+          final result = 'directed by ${dir['name']}';
+          _creditsCache[cacheKey] = result;
+          return result;
+        }
+      } else if (type == 'tv') {
+        // Dizi için /tv/{id} → created_by listesi
+        final url = Uri.parse(
+          '$_baseUrl/tv/$id?api_key=$_apiKey',
+        );
+        final res = await http.get(url);
+        if (res.statusCode != 200) return null;
+
+        final data = jsonDecode(res.body);
+        final createdBy = data['created_by'] as List<dynamic>? ?? [];
+
+        if (createdBy.isNotEmpty) {
+          final names =
+              createdBy.map((c) => c['name'].toString()).join(', ');
+          final result = 'created by $names';
+          _creditsCache[cacheKey] = result;
+          return result;
+        }
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    return null;
+  }
+
   // ===============================
   // 1) SEARCH MULTI (HomePage arama)
   // ===============================

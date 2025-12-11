@@ -183,21 +183,20 @@ class _InfoPageState extends State<InfoPage> {
     final titleText = _details!['title'] ?? widget.title;
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: const Color(0xFF202124),
-      appBar: AppBar(
-        backgroundColor: _showTopBar ? Colors.black : Colors.transparent,
-        elevation: _showTopBar ? 1 : 0,
-        centerTitle: true,
-        title: _showTopBar
-            ? Text(
-                titleText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )
-            : null,
-        automaticallyImplyLeading: _showTopBar,
-      ),
+  extendBodyBehindAppBar: true,
+  backgroundColor: const Color(0xFF202124),
+  appBar: _showTopBar
+      ? AppBar(
+          backgroundColor: Colors.black,
+          elevation: 1,
+          centerTitle: true,
+          title: Text(
+            titleText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        )
+      : null,  
       body: SafeArea(
         top: false,
         child: NotificationListener<ScrollNotification>(
@@ -496,7 +495,7 @@ class _InfoPageState extends State<InfoPage> {
                                 Icons.movie_creation_outlined),
                         const SizedBox(height: 8),
                         SizedBox(
-                          height: 200,
+                          height: 210,
                           child: ListView.builder(
                             scrollDirection:
                                 Axis.horizontal,
