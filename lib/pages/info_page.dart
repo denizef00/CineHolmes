@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/tmdb_service.dart';
-import '../pages/library_provider.dart';
 
 class InfoPage extends StatefulWidget {
   final int id;
@@ -124,9 +122,8 @@ class _InfoPageState extends State<InfoPage> {
             ),
           ],
         ),
-        backgroundColor: added
-            ? const Color(0xFF1B5E20)
-            : const Color(0xFFB71C1C),
+        backgroundColor:
+            added ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.only(
           left: 16,
@@ -170,10 +167,13 @@ class _InfoPageState extends State<InfoPage> {
 
   // Show list selection modal
   void _showAddToListModal() {
+    if (_details == null) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      enableDrag: false, 
       builder: (context) => _AddToListModal(
         movieId: widget.id.toString(),
         movieData: {
@@ -242,15 +242,18 @@ class _InfoPageState extends State<InfoPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF202124),
-      appBar: AppBar(
-        backgroundColor: _showTopBar ? Colors.black : Colors.transparent,
-        elevation: _showTopBar ? 1 : 0,
-        centerTitle: true,
-        title: _showTopBar
-            ? Text(titleText, maxLines: 1, overflow: TextOverflow.ellipsis)
-            : null,
-        automaticallyImplyLeading: _showTopBar,
-      ),
+      appBar: _showTopBar
+          ? AppBar(
+              backgroundColor: Colors.black,
+              elevation: 1,
+              centerTitle: true,
+              title: Text(
+                titleText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            )
+          : null,
       body: SafeArea(
         top: false,
         child: NotificationListener<ScrollNotification>(
@@ -272,7 +275,8 @@ class _InfoPageState extends State<InfoPage> {
                 ),
 
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 24.0),
+                  padding:
+                      const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -287,7 +291,8 @@ class _InfoPageState extends State<InfoPage> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          const Icon(Icons.star,
+                              color: Colors.amber, size: 18),
                           const SizedBox(width: 4),
                           Text(
                             '$rating',
@@ -297,13 +302,15 @@ class _InfoPageState extends State<InfoPage> {
                             const SizedBox(width: 10),
                             Text(
                               '· $year',
-                              style: const TextStyle(color: Colors.white70),
+                              style:
+                                  const TextStyle(color: Colors.white70),
                             ),
                           ],
                           const SizedBox(width: 10),
                           Text(
                             '· $durationText',
-                            style: const TextStyle(color: Colors.white70),
+                            style:
+                                const TextStyle(color: Colors.white70),
                           ),
                         ],
                       ),
@@ -311,7 +318,8 @@ class _InfoPageState extends State<InfoPage> {
                       const SizedBox(height: 18),
 
                       // Overview
-                      _sectionTitle('Overview', theme, icon: Icons.subject),
+                      _sectionTitle('Overview', theme,
+                          icon: Icons.subject),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -329,7 +337,8 @@ class _InfoPageState extends State<InfoPage> {
                         ),
                         child: Text(
                           overview,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style:
+                              theme.textTheme.bodyMedium?.copyWith(
                             height: 1.4,
                             color: Colors.white70,
                           ),
@@ -357,13 +366,15 @@ class _InfoPageState extends State<InfoPage> {
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: _trailer != null ? _openTrailer : null,
+                              onPressed:
+                                  _trailer != null ? _openTrailer : null,
                               icon: const Icon(Icons.play_arrow),
                               label: const Text('Watch Trailer'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFD32F2F),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
+                                padding:
+                                    const EdgeInsets.symmetric(
                                   vertical: 12,
                                 ),
                               ),
@@ -379,17 +390,22 @@ class _InfoPageState extends State<InfoPage> {
                                 return ElevatedButton.icon(
                                   onPressed: _showAddToListModal,
                                   icon: Icon(
-                                    isInList ? Icons.check : Icons.add,
+                                    isInList
+                                        ? Icons.check
+                                        : Icons.add,
                                   ),
                                   label: Text(
-                                    isInList ? 'In Lists' : 'Add to List',
+                                    isInList
+                                        ? 'In Lists'
+                                        : 'Add to List',
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: isInList
                                         ? const Color(0xFF2E7D32)
                                         : Colors.grey.shade800,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
+                                    padding:
+                                        const EdgeInsets.symmetric(
                                       vertical: 12,
                                     ),
                                   ),
@@ -404,7 +420,8 @@ class _InfoPageState extends State<InfoPage> {
 
                       // CAST
                       if (_cast.isNotEmpty) ...[
-                        _sectionTitle('Cast', theme, icon: Icons.people_alt),
+                        _sectionTitle('Cast', theme,
+                            icon: Icons.people_alt),
                         const SizedBox(height: 8),
                         SizedBox(
                           height: 120,
@@ -415,15 +432,19 @@ class _InfoPageState extends State<InfoPage> {
                               final actor = _cast[index];
                               return Container(
                                 width: 80,
-                                margin: const EdgeInsets.only(right: 10),
+                                margin:
+                                    const EdgeInsets.only(right: 10),
                                 child: Column(
                                   children: [
                                     CircleAvatar(
                                       radius: 28,
-                                      backgroundImage: actor['profile'] != ''
-                                          ? NetworkImage(actor['profile'])
-                                          : null,
-                                      backgroundColor: Colors.grey.shade700,
+                                      backgroundImage:
+                                          actor['profile'] != ''
+                                              ? NetworkImage(
+                                                  actor['profile'])
+                                              : null,
+                                      backgroundColor:
+                                          Colors.grey.shade700,
                                       child: actor['profile'] == ''
                                           ? const Icon(
                                               Icons.person,
@@ -439,7 +460,8 @@ class _InfoPageState extends State<InfoPage> {
                                         color: Colors.white,
                                       ),
                                       maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
+                                      overflow:
+                                          TextOverflow.ellipsis,
                                       textAlign: TextAlign.center,
                                     ),
                                   ],
@@ -462,14 +484,17 @@ class _InfoPageState extends State<InfoPage> {
                         ..._reviews.map((r) {
                           return Card(
                             color: const Color(0xFF1E1E2C),
-                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            margin: const EdgeInsets.symmetric(
+                                vertical: 6),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius:
+                                  BorderRadius.circular(10),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(10),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     r['author'],
@@ -482,7 +507,8 @@ class _InfoPageState extends State<InfoPage> {
                                   Text(
                                     r['content'],
                                     maxLines: 4,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow:
+                                        TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.white70,
                                     ),
@@ -504,7 +530,7 @@ class _InfoPageState extends State<InfoPage> {
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
-                          height: 200,
+                          height: 210,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
                             itemCount: _similar.length,
@@ -518,42 +544,55 @@ class _InfoPageState extends State<InfoPage> {
                                       builder: (_) => InfoPage(
                                         id: s['id'],
                                         title: s['title'],
-                                        type: s['type'] ?? widget.type,
+                                        type: s['type'] ??
+                                            widget.type,
                                       ),
                                     ),
                                   );
                                 },
                                 child: Container(
                                   width: 130,
-                                  margin: const EdgeInsets.only(right: 12),
+                                  margin:
+                                      const EdgeInsets.only(right: 12),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
                                       ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius:
+                                            BorderRadius.circular(
+                                                10),
                                         child: s['poster'] != ''
                                             ? Image.network(
                                                 s['poster'],
                                                 height: 160,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
+                                                errorBuilder: (_,
+                                                        __,
+                                                        ___) =>
                                                     Container(
                                                       height: 160,
-                                                      color:
-                                                          Colors.grey.shade800,
-                                                      child: const Icon(
-                                                        Icons.broken_image,
-                                                        color: Colors.white,
+                                                      color: Colors
+                                                          .grey
+                                                          .shade800,
+                                                      child:
+                                                          const Icon(
+                                                        Icons
+                                                            .broken_image,
+                                                        color: Colors
+                                                            .white,
                                                       ),
                                                     ),
                                               )
                                             : Container(
                                                 height: 160,
-                                                color: Colors.grey.shade800,
+                                                color: Colors
+                                                    .grey.shade800,
                                                 child: const Icon(
-                                                  Icons.broken_image,
-                                                  color: Colors.white,
+                                                  Icons
+                                                      .broken_image,
+                                                  color: Colors
+                                                      .white,
                                                 ),
                                               ),
                                       ),
@@ -565,7 +604,8 @@ class _InfoPageState extends State<InfoPage> {
                                           color: Colors.white,
                                         ),
                                         maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                        overflow:
+                                            TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
@@ -711,6 +751,8 @@ class _AddToListModalState extends State<_AddToListModal> {
   bool _isAdding = false;
 
   Future<void> _addToList(String listId, String listName) async {
+    if (_isAdding) return;
+
     setState(() => _isAdding = true);
 
     try {
@@ -745,7 +787,10 @@ class _AddToListModalState extends State<_AddToListModal> {
           .collection('lists')
           .doc(listId)
           .collection('movies')
-          .add({...widget.movieData, 'addedAt': FieldValue.serverTimestamp()});
+          .add({
+        ...widget.movieData,
+        'addedAt': FieldValue.serverTimestamp(),
+      });
 
       // Update movie count
       final listDoc = await _firestore
@@ -764,41 +809,46 @@ class _AddToListModalState extends State<_AddToListModal> {
           .update({'movieCount': currentCount + 1});
 
       if (mounted) {
-        Navigator.pop(context);
-        widget.onSuccess(listName);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isAdding = false);
-      }
+      // ❌ Burada da Navigator.pop yok
+      widget.onSuccess(listName); // _showLibrarySnack(...) çağırıyor
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isAdding = false);
     }
   }
-
+}
   @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.4,
-      maxChildSize: 0.9,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
+  @override
+Widget build(BuildContext context) {
+  final mediaQuery = MediaQuery.of(context);
+  final sheetHeight = mediaQuery.size.height * 0.65; // ~%65
+
+  return Padding(
+    padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+    child: Container(
+      height: sheetHeight,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // 🔹 HEADER (handle + "Add to List")
+          // Artık GestureDetector yok, tıklayınca kapanmıyor.
+          Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle bar
               const SizedBox(height: 12),
               Container(
                 width: 40,
@@ -809,13 +859,12 @@ class _AddToListModalState extends State<_AddToListModal> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Title
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    Icon(Icons.playlist_add, color: Colors.white, size: 24),
+                    Icon(Icons.playlist_add,
+                        color: Colors.white, size: 24),
                     SizedBox(width: 12),
                     Text(
                       'Add to List',
@@ -828,155 +877,155 @@ class _AddToListModalState extends State<_AddToListModal> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Lists
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: _firestore
-                      .collection('users')
-                      .doc(userId)
-                      .collection('lists')
-                      .orderBy('createdAt', descending: true)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return const Center(
-                        child: Text(
-                          'Error loading lists',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      );
-                    }
-
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFFFFC107),
-                        ),
-                      );
-                    }
-
-                    final lists = snapshot.data?.docs ?? [];
-
-                    if (lists.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.list_alt_outlined,
-                              size: 64,
-                              color: Colors.white.withOpacity(0.5),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No lists yet',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Create a list from the Library page',
-                              style: TextStyle(
-                                color: Colors.white54,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: lists.length,
-                      itemBuilder: (context, index) {
-                        final listData =
-                            lists[index].data() as Map<String, dynamic>;
-                        final listId = lists[index].id;
-                        final listName = listData['name'] ?? 'Unnamed List';
-                        final movieCount = listData['movieCount'] ?? 0;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2C2C2E),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
-                            ),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFFFC107),
-                                    Color(0xFFFF9800),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.list_alt,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            title: Text(
-                              listName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '$movieCount movies',
-                              style: const TextStyle(
-                                color: Colors.white60,
-                                fontSize: 13,
-                              ),
-                            ),
-                            trailing: _isAdding
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFFFFC107),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.add_circle_outline,
-                                    color: Color(0xFFFFC107),
-                                    size: 28,
-                                  ),
-                            onTap: _isAdding
-                                ? null
-                                : () => _addToList(listId, listName),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
+              const SizedBox(height: 16),
             ],
           ),
-        );
-      },
-    );
-  }
+
+          // 🔹 SADECE BURASI SCROLL EDİYOR (listeler)
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(userId)
+                  .collection('lists')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text(
+                      'Error loading lists',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFFFC107),
+                    ),
+                  );
+                }
+
+                final lists = snapshot.data?.docs ?? [];
+
+                if (lists.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.list_alt_outlined,
+                          size: 64,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No lists yet',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Create a list from the Library page',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: lists.length,
+                  itemBuilder: (context, index) {
+                    final listData =
+                        lists[index].data() as Map<String, dynamic>;
+                    final listId = lists[index].id;
+                    final listName = listData['name'] ?? 'Unnamed List';
+                    final movieCount = listData['movieCount'] ?? 0;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2C2C2E),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        leading: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFFFC107),
+                                Color(0xFFFF9800),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.list_alt,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        title: Text(
+                          listName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '$movieCount movies',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 13,
+                          ),
+                        ),
+                        trailing: _isAdding
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFFFC107),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.add_circle_outline,
+                                color: Color(0xFFFFC107),
+                                size: 28,
+                              ),
+                        onTap: _isAdding
+                            ? null
+                            : () => _addToList(listId, listName),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 }
