@@ -1,3 +1,153 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class LibraryProvider extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  List<Map<String, dynamic>> _libraryItems = [];
+  bool _isLoading = false;
+
+  // 🔥 Şu an aktif olan liste ID
+  String _currentListId = "favoriler";
+  String get currentListId => _currentListId;
+
+  List<Map<String, dynamic>> get libraryItems => _libraryItems;
+  bool get isLoading => _isLoading;
+
+  // ------------------------------------------------------------
+  // 🔥 Aktif listeyi değiştir
+  // ------------------------------------------------------------
+  void setCurrentList(String newListId) {
+    _currentListId = newListId;
+    loadLibrary(); // Liste değişince yeniden yükle
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Şu anki liste koleksiyonuna erişim
+  // ------------------------------------------------------------
+  CollectionReference get _userLibrary {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception("No user logged in");
+    }
+
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('lists')
+        .doc(_currentListId)
+        .collection('items');
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Kütüphaneyi Yükle
+  // ------------------------------------------------------------
+  Future<void> loadLibrary() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      _libraryItems = [];
+      notifyListeners();
+      return;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final snapshot = await _userLibrary.get();
+
+      _libraryItems = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['firestoreId'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('❌ Error loading library: $e');
+      _libraryItems = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Listede var mı kontrol et
+  // ------------------------------------------------------------
+  bool isInLibrary(int id) {
+    return _libraryItems.any((item) => item['id'] == id);
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Listeye ekle
+  // ------------------------------------------------------------
+  Future<void> addToLibrary(Map<String, dynamic> item) async {
+    try {
+      if (isInLibrary(item['id'])) return;
+
+      final docRef = await _userLibrary.add({
+        'id': item['id'],
+        'title': item['title'],
+        'poster': item['poster'],
+        'rating': item['rating'],
+        'year': item['year'],
+        'type': item['type'],
+        'addedAt': FieldValue.serverTimestamp(),
+      });
+
+      final newItem = Map<String, dynamic>.from(item);
+      newItem['firestoreId'] = docRef.id;
+      _libraryItems.add(newItem);
+
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error adding: $e');
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Listeden çıkar
+  // ------------------------------------------------------------
+  Future<void> removeFromLibrary(int id) async {
+    try {
+      final item = _libraryItems.firstWhere(
+        (item) => item['id'] == id,
+        orElse: () => {},
+      );
+
+      if (item.isEmpty) return;
+
+      await _userLibrary.doc(item['firestoreId']).delete();
+      _libraryItems.removeWhere((element) => element['id'] == id);
+
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error removing: $e');
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Toggle
+  // ------------------------------------------------------------
+  Future<void> toggleLibrary(Map<String, dynamic> item) async {
+    if (isInLibrary(item['id'])) {
+      await removeFromLibrary(item['id']);
+    } else {
+      await addToLibrary(item);
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 🔥 Temizle
+  // ------------------------------------------------------------
+  void clearLibrary() {
+    _libraryItems = [];
+    notifyListeners();
+  }
+}
+
+/*
 // lib/providers/library_provider.dart
 
 import 'package:flutter/material.dart';
@@ -18,7 +168,12 @@ class LibraryProvider extends ChangeNotifier {
   CollectionReference? get _userLibrary {
     final user = _auth.currentUser;
     if (user == null) return null;
-    return _firestore.collection('users').doc(user.uid).collection('library');
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('lists')
+        .doc("favoriler")
+        .collection("Favoriler");
   }
 
   // Kütüphaneyi Firestore'dan yükle
@@ -136,4 +291,4 @@ class LibraryProvider extends ChangeNotifier {
     _libraryItems = [];
     notifyListeners();
   }
-}
+}*/

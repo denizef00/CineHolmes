@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/tmdb_service.dart';
 import '../pages/library_provider.dart';
@@ -23,6 +25,8 @@ class InfoPage extends StatefulWidget {
 
 class _InfoPageState extends State<InfoPage> {
   final tmdb = TMDBService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Map<String, dynamic>? _details;
   List<Map<String, dynamic>> _cast = [];
@@ -32,6 +36,8 @@ class _InfoPageState extends State<InfoPage> {
   bool _loading = true;
 
   bool _showTopBar = false;
+
+  String get userId => _auth.currentUser?.uid ?? '';
 
   @override
   void initState() {
@@ -118,18 +124,69 @@ class _InfoPageState extends State<InfoPage> {
             ),
           ],
         ),
-        backgroundColor:
-            added ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C),
+        backgroundColor: added
+            ? const Color(0xFF1B5E20)
+            : const Color(0xFFB71C1C),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.only(
           left: 16,
           right: 16,
           bottom: kBottomNavigationBarHeight + 16,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Check if movie is in any list
+  Future<bool> _isInAnyList() async {
+    try {
+      final listsSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .get();
+
+      for (var listDoc in listsSnapshot.docs) {
+        final movieSnapshot = await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('lists')
+            .doc(listDoc.id)
+            .collection('movies')
+            .where('id', isEqualTo: widget.id.toString())
+            .get();
+
+        if (movieSnapshot.docs.isNotEmpty) {
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Show list selection modal
+  void _showAddToListModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _AddToListModal(
+        movieId: widget.id.toString(),
+        movieData: {
+          'id': widget.id.toString(),
+          'title': _details!['title'] ?? widget.title,
+          'poster': _details!['poster'] ?? '',
+          'rating': (_details!['rating'] ?? 'N/A').toString(),
+          'year': (_details!['year'] ?? '').toString(),
+          'type': widget.type,
+        },
+        onSuccess: (listName) {
+          _showLibrarySnack(context, 'Added to "$listName"', added: true);
+        },
       ),
     );
   }
@@ -183,20 +240,17 @@ class _InfoPageState extends State<InfoPage> {
     final titleText = _details!['title'] ?? widget.title;
 
     return Scaffold(
-  extendBodyBehindAppBar: true,
-  backgroundColor: const Color(0xFF202124),
-  appBar: _showTopBar
-      ? AppBar(
-          backgroundColor: Colors.black,
-          elevation: 1,
-          centerTitle: true,
-          title: Text(
-            titleText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )
-      : null,  
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFF202124),
+      appBar: AppBar(
+        backgroundColor: _showTopBar ? Colors.black : Colors.transparent,
+        elevation: _showTopBar ? 1 : 0,
+        centerTitle: true,
+        title: _showTopBar
+            ? Text(titleText, maxLines: 1, overflow: TextOverflow.ellipsis)
+            : null,
+        automaticallyImplyLeading: _showTopBar,
+      ),
       body: SafeArea(
         top: false,
         child: NotificationListener<ScrollNotification>(
@@ -210,7 +264,7 @@ class _InfoPageState extends State<InfoPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔥 HERO – ekranın %30’u, full genişlik
+                // HERO
                 _buildHeroSection(
                   context: context,
                   poster: poster,
@@ -218,12 +272,11 @@ class _InfoPageState extends State<InfoPage> {
                 ),
 
                 Padding(
-                  padding:
-                      const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 24.0),
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Başlık + meta
+                      // Title + meta
                       Text(
                         titleText,
                         style: theme.textTheme.headlineSmall?.copyWith(
@@ -234,8 +287,7 @@ class _InfoPageState extends State<InfoPage> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.star,
-                              color: Colors.amber, size: 18),
+                          const Icon(Icons.star, color: Colors.amber, size: 18),
                           const SizedBox(width: 4),
                           Text(
                             '$rating',
@@ -245,15 +297,13 @@ class _InfoPageState extends State<InfoPage> {
                             const SizedBox(width: 10),
                             Text(
                               '· $year',
-                              style:
-                                  const TextStyle(color: Colors.white70),
+                              style: const TextStyle(color: Colors.white70),
                             ),
                           ],
                           const SizedBox(width: 10),
                           Text(
                             '· $durationText',
-                            style:
-                                const TextStyle(color: Colors.white70),
+                            style: const TextStyle(color: Colors.white70),
                           ),
                         ],
                       ),
@@ -261,8 +311,7 @@ class _InfoPageState extends State<InfoPage> {
                       const SizedBox(height: 18),
 
                       // Overview
-                      _sectionTitle('Overview', theme,
-                          icon: Icons.subject),
+                      _sectionTitle('Overview', theme, icon: Icons.subject),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -275,7 +324,9 @@ class _InfoPageState extends State<InfoPage> {
                           ),
                         ),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         child: Text(
                           overview,
                           style: theme.textTheme.bodyMedium?.copyWith(
@@ -285,7 +336,7 @@ class _InfoPageState extends State<InfoPage> {
                         ),
                       ),
 
-                      // GENRE – daha belirgin
+                      // GENRE
                       if (genres.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Text(
@@ -301,96 +352,59 @@ class _InfoPageState extends State<InfoPage> {
 
                       const SizedBox(height: 20),
 
-                      // BUTONLAR
-                      Consumer<LibraryProvider>(
-                        builder:
-                            (context, libraryProvider, child) {
-                          final isInLibrary =
-                              libraryProvider.isInLibrary(widget.id);
-
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _trailer != null
-                                      ? _openTrailer
-                                      : null,
-                                  icon:
-                                      const Icon(Icons.play_arrow),
-                                  label: const Text('Watch Trailer'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        const Color(0xFFD32F2F),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 12),
-                                  ),
+                      // BUTTONS
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _trailer != null ? _openTrailer : null,
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Watch Trailer'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD32F2F),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    if (isInLibrary) {
-                                      await libraryProvider
-                                          .removeFromLibrary(
-                                              widget.id);
-                                      if (!mounted) return;
-                                      _showLibrarySnack(
-                                        context,
-                                        '$titleText removed from library',
-                                        added: false,
-                                      );
-                                    } else {
-                                      await libraryProvider
-                                          .addToLibrary({
-                                        'id': widget.id,
-                                        'title': titleText,
-                                        'poster': poster,
-                                        'rating':
-                                            rating.toString(),
-                                        'year': year.toString(),
-                                        'type': widget.type,
-                                      });
-                                      if (!mounted) return;
-                                      _showLibrarySnack(
-                                        context,
-                                        '$titleText added to library',
-                                        added: true,
-                                      );
-                                    }
-                                  },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FutureBuilder<bool>(
+                              future: _isInAnyList(),
+                              builder: (context, snapshot) {
+                                final isInList = snapshot.data ?? false;
+
+                                return ElevatedButton.icon(
+                                  onPressed: _showAddToListModal,
                                   icon: Icon(
-                                    isInLibrary
-                                        ? Icons.check
-                                        : Icons.add,
+                                    isInList ? Icons.check : Icons.add,
                                   ),
                                   label: Text(
-                                    isInLibrary
-                                        ? 'In Library'
-                                        : 'Add to Library',
+                                    isInList ? 'In Lists' : 'Add to List',
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isInLibrary
+                                    backgroundColor: isInList
                                         ? const Color(0xFF2E7D32)
                                         : Colors.grey.shade800,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 12),
+                                      vertical: 12,
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 24),
 
                       // CAST
                       if (_cast.isNotEmpty) ...[
-                        _sectionTitle('Cast', theme,
-                            icon: Icons.people_alt),
+                        _sectionTitle('Cast', theme, icon: Icons.people_alt),
                         const SizedBox(height: 8),
                         SizedBox(
                           height: 120,
@@ -401,19 +415,15 @@ class _InfoPageState extends State<InfoPage> {
                               final actor = _cast[index];
                               return Container(
                                 width: 80,
-                                margin: const EdgeInsets.only(
-                                    right: 10),
+                                margin: const EdgeInsets.only(right: 10),
                                 child: Column(
                                   children: [
                                     CircleAvatar(
                                       radius: 28,
-                                      backgroundImage:
-                                          actor['profile'] != ''
-                                              ? NetworkImage(
-                                                  actor['profile'])
-                                              : null,
-                                      backgroundColor:
-                                          Colors.grey.shade700,
+                                      backgroundImage: actor['profile'] != ''
+                                          ? NetworkImage(actor['profile'])
+                                          : null,
+                                      backgroundColor: Colors.grey.shade700,
                                       child: actor['profile'] == ''
                                           ? const Icon(
                                               Icons.person,
@@ -429,8 +439,7 @@ class _InfoPageState extends State<InfoPage> {
                                         color: Colors.white,
                                       ),
                                       maxLines: 2,
-                                      overflow:
-                                          TextOverflow.ellipsis,
+                                      overflow: TextOverflow.ellipsis,
                                       textAlign: TextAlign.center,
                                     ),
                                   ],
@@ -444,30 +453,28 @@ class _InfoPageState extends State<InfoPage> {
 
                       // REVIEWS
                       if (_reviews.isNotEmpty) ...[
-                        _sectionTitle('Top Reviews', theme,
-                            icon: Icons.rate_review),
+                        _sectionTitle(
+                          'Top Reviews',
+                          theme,
+                          icon: Icons.rate_review,
+                        ),
                         const SizedBox(height: 8),
                         ..._reviews.map((r) {
                           return Card(
                             color: const Color(0xFF1E1E2C),
-                            margin:
-                                const EdgeInsets.symmetric(
-                                    vertical: 6),
+                            margin: const EdgeInsets.symmetric(vertical: 6),
                             shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(10),
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     r['author'],
                                     style: const TextStyle(
-                                      fontWeight:
-                                          FontWeight.bold,
+                                      fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
                                   ),
@@ -475,10 +482,10 @@ class _InfoPageState extends State<InfoPage> {
                                   Text(
                                     r['content'],
                                     maxLines: 4,
-                                    overflow:
-                                        TextOverflow.ellipsis,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                        color: Colors.white70),
+                                      color: Colors.white70,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -490,15 +497,16 @@ class _InfoPageState extends State<InfoPage> {
 
                       // SIMILAR
                       if (_similar.isNotEmpty) ...[
-                        _sectionTitle('Similar', theme,
-                            icon:
-                                Icons.movie_creation_outlined),
+                        _sectionTitle(
+                          'Similar',
+                          theme,
+                          icon: Icons.movie_creation_outlined,
+                        ),
                         const SizedBox(height: 8),
                         SizedBox(
-                          height: 210,
+                          height: 200,
                           child: ListView.builder(
-                            scrollDirection:
-                                Axis.horizontal,
+                            scrollDirection: Axis.horizontal,
                             itemCount: _similar.length,
                             itemBuilder: (context, index) {
                               final s = _similar[index];
@@ -507,87 +515,58 @@ class _InfoPageState extends State<InfoPage> {
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          InfoPage(
+                                      builder: (_) => InfoPage(
                                         id: s['id'],
                                         title: s['title'],
-                                        type: s['type'] ??
-                                            widget.type,
+                                        type: s['type'] ?? widget.type,
                                       ),
                                     ),
                                   );
                                 },
                                 child: Container(
                                   width: 130,
-                                  margin:
-                                      const EdgeInsets.only(
-                                          right: 12),
+                                  margin: const EdgeInsets.only(right: 12),
                                   child: Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment
-                                            .center,
+                                        CrossAxisAlignment.center,
                                     children: [
                                       ClipRRect(
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(
-                                                    10),
-                                        child: s['poster'] !=
-                                                ''
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: s['poster'] != ''
                                             ? Image.network(
                                                 s['poster'],
                                                 height: 160,
-                                                fit: BoxFit
-                                                    .cover,
-                                                errorBuilder:
-                                                    (_, __,
-                                                        ___) =>
-                                                        Container(
-                                                  height:
-                                                      160,
-                                                  color: Colors
-                                                      .grey
-                                                      .shade800,
-                                                  child:
-                                                      const Icon(
-                                                    Icons
-                                                        .broken_image,
-                                                    color: Colors
-                                                        .white,
-                                                  ),
-                                                ),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    Container(
+                                                      height: 160,
+                                                      color:
+                                                          Colors.grey.shade800,
+                                                      child: const Icon(
+                                                        Icons.broken_image,
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
                                               )
                                             : Container(
                                                 height: 160,
-                                                color: Colors
-                                                    .grey
-                                                    .shade800,
-                                                child:
-                                                    const Icon(
-                                                  Icons
-                                                      .broken_image,
-                                                  color: Colors
-                                                      .white,
+                                                color: Colors.grey.shade800,
+                                                child: const Icon(
+                                                  Icons.broken_image,
+                                                  color: Colors.white,
                                                 ),
                                               ),
                                       ),
-                                      const SizedBox(
-                                          height: 6),
+                                      const SizedBox(height: 6),
                                       Text(
                                         s['title'],
-                                        style:
-                                            const TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 12,
-                                          color:
-                                              Colors.white,
+                                          color: Colors.white,
                                         ),
                                         maxLines: 2,
-                                        overflow:
-                                            TextOverflow
-                                                .ellipsis,
-                                        textAlign:
-                                            TextAlign
-                                                .center,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
                                       ),
                                     ],
                                   ),
@@ -608,7 +587,6 @@ class _InfoPageState extends State<InfoPage> {
     );
   }
 
-  // HERO – ekranın %30’u, full width, geri tuşu burada
   Widget _buildHeroSection({
     required BuildContext context,
     required String poster,
@@ -616,7 +594,7 @@ class _InfoPageState extends State<InfoPage> {
   }) {
     final imageUrl = (backdrop.isNotEmpty) ? backdrop : poster;
     final screenHeight = MediaQuery.of(context).size.height;
-    final heroHeight = screenHeight * 0.30; // <-- %30
+    final heroHeight = screenHeight * 0.30;
 
     return SizedBox(
       height: heroHeight,
@@ -647,7 +625,6 @@ class _InfoPageState extends State<InfoPage> {
               ),
             ),
 
-          // üst taraf için hafif karartma
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -663,7 +640,6 @@ class _InfoPageState extends State<InfoPage> {
             ),
           ),
 
-          // geri butonu
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 8,
@@ -673,8 +649,7 @@ class _InfoPageState extends State<InfoPage> {
               child: CircleAvatar(
                 backgroundColor: Colors.black.withOpacity(0.6),
                 child: IconButton(
-                  icon:
-                      const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
                     if (Navigator.of(context).canPop()) {
                       Navigator.of(context).pop();
@@ -689,8 +664,7 @@ class _InfoPageState extends State<InfoPage> {
     );
   }
 
-  Widget _sectionTitle(String title, ThemeData theme,
-      {IconData? icon}) {
+  Widget _sectionTitle(String title, ThemeData theme, {IconData? icon}) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Row(
@@ -713,4 +687,296 @@ class _InfoPageState extends State<InfoPage> {
   }
 }
 
+// Add to List Modal Widget
+class _AddToListModal extends StatefulWidget {
+  final String movieId;
+  final Map<String, dynamic> movieData;
+  final Function(String listName) onSuccess;
 
+  const _AddToListModal({
+    required this.movieId,
+    required this.movieData,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_AddToListModal> createState() => _AddToListModalState();
+}
+
+class _AddToListModalState extends State<_AddToListModal> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String get userId => _auth.currentUser?.uid ?? '';
+  bool _isAdding = false;
+
+  Future<void> _addToList(String listId, String listName) async {
+    setState(() => _isAdding = true);
+
+    try {
+      // Check if already in this list
+      final existingMovie = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .doc(listId)
+          .collection('movies')
+          .where('id', isEqualTo: widget.movieId)
+          .get();
+
+      if (existingMovie.docs.isNotEmpty) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Already in "$listName"'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Add to list
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .doc(listId)
+          .collection('movies')
+          .add({...widget.movieData, 'addedAt': FieldValue.serverTimestamp()});
+
+      // Update movie count
+      final listDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .doc(listId)
+          .get();
+
+      final currentCount = (listDoc.data()?['movieCount'] ?? 0) as int;
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .doc(listId)
+          .update({'movieCount': currentCount + 1});
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onSuccess(listName);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAdding = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade600,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Icon(Icons.playlist_add, color: Colors.white, size: 24),
+                    SizedBox(width: 12),
+                    Text(
+                      'Add to List',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Lists
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _firestore
+                      .collection('users')
+                      .doc(userId)
+                      .collection('lists')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text(
+                          'Error loading lists',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFFFC107),
+                        ),
+                      );
+                    }
+
+                    final lists = snapshot.data?.docs ?? [];
+
+                    if (lists.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.list_alt_outlined,
+                              size: 64,
+                              color: Colors.white.withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No lists yet',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Create a list from the Library page',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: lists.length,
+                      itemBuilder: (context, index) {
+                        final listData =
+                            lists[index].data() as Map<String, dynamic>;
+                        final listId = lists[index].id;
+                        final listName = listData['name'] ?? 'Unnamed List';
+                        final movieCount = listData['movieCount'] ?? 0;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2E),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 1,
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            leading: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFFC107),
+                                    Color(0xFFFF9800),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.list_alt,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            title: Text(
+                              listName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '$movieCount movies',
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 13,
+                              ),
+                            ),
+                            trailing: _isAdding
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFFFFC107),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.add_circle_outline,
+                                    color: Color(0xFFFFC107),
+                                    size: 28,
+                                  ),
+                            onTap: _isAdding
+                                ? null
+                                : () => _addToList(listId, listName),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
