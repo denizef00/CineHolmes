@@ -587,6 +587,8 @@ Return only that single line.''',
     return null;
   }// ---------- BUILD ----------
 
+ // ---------- BUILD ----------
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -858,7 +860,33 @@ Return only that single line.''',
                                   ),
                                 ),
                                 
-                                // Favorite button
+                                // Close button (sol üst)
+                                Positioned(
+                                  top: 12,
+                                  left: 12,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        movieData = null;
+                                        status = "No video selected yet.";
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.black.withOpacity(0.6),
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Favorite button (sağ üst)
                                 Positioned(
                                   top: 12,
                                   right: 12,

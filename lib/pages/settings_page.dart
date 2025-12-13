@@ -13,7 +13,6 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _showAiLogs = false;
   bool _autoOpenInfoPage = true;
   bool _showSnackbars = true;
-  String _defaultTab = 'home';
 
   @override
   Widget build(BuildContext context) {
@@ -55,70 +54,30 @@ class _SettingsPageState extends State<SettingsPage> {
                   const SizedBox(height: 8),
                   _glassCard(
                     isDark: isDark,
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          secondary: Icon(
-                            isDark
-                                ? Icons.dark_mode_rounded
-                                : Icons.light_mode_rounded,
-                            color: isDark ? Colors.amber : Colors.deepPurple,
-                          ),
-                          title: Text(
-                            'Dark Theme',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Use dark mode for a cinematic, eye-friendly look.',
-                            style: TextStyle(
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                          ),
-                          value: themeProvider.isDark,
-                          onChanged: (_) => themeProvider.toggleTheme(),
-                          activeThumbColor: Colors.deepPurpleAccent,
+                    child: SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      secondary: Icon(
+                        isDark
+                            ? Icons.dark_mode_rounded
+                            : Icons.light_mode_rounded,
+                        color: isDark ? Colors.amber : Colors.deepPurple,
+                      ),
+                      title: Text(
+                        'Dark Theme',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
-                        Divider(
-                          height: 1,
-                          color: isDark
-                              ? Colors.white.withOpacity(0.1)
-                              : Colors.black.withOpacity(0.1),
+                      ),
+                      subtitle: Text(
+                        'Use dark mode for a cinematic, eye-friendly look.',
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : Colors.black54,
                         ),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          leading: Icon(
-                            Icons.palette_outlined,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                          title: Text(
-                            'Accent color',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Purple • (More colors coming soon)',
-                            style: TextStyle(
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _accentDot(const Color(0xFF6A0DAD)),
-                              const SizedBox(width: 6),
-                              _accentDot(Colors.blueGrey, isSelected: false),
-                              const SizedBox(width: 6),
-                              _accentDot(Colors.teal, isSelected: false),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
+                      value: themeProvider.isDark,
+                      onChanged: (_) => themeProvider.toggleTheme(),
+                      activeThumbColor: Colors.deepPurpleAccent,
                     ),
                   ),
 
@@ -131,118 +90,33 @@ class _SettingsPageState extends State<SettingsPage> {
                     isDark: isDark,
                     child: Column(
                       children: [
-                        // Default tab
-                        ListTile(
-                          leading: Icon(
-                            Icons.home_work_outlined,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                          title: Text(
-                            'Default start page',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          subtitle: Text(
-                            _defaultTab == 'home'
-                                ? 'Home'
-                                : _defaultTab == 'library'
-                                    ? 'Library'
-                                    : 'Upload',
-                            style: TextStyle(
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                          ),
-                          trailing: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _defaultTab,
-                              dropdownColor: isDark
-                                  ? const Color(0xFF1A1A1A)
-                                  : Colors.white,
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                              items: [
-                                DropdownMenuItem(
-                                  value: 'home',
-                                  child: Text(
-                                    'Home',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'library',
-                                  child: Text(
-                                    'Library',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'upload',
-                                  child: Text(
-                                    'Upload',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _defaultTab = value;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Default page preference saved (UI only for now).',
-                                    ),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        Divider(
-                          height: 1,
-                          color: isDark
-                              ? Colors.white.withOpacity(0.1)
-                              : Colors.black.withOpacity(0.1),
-                        ),
+                        // Auto Open Details
                         SwitchListTile(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
                           secondary: Icon(
-                            Icons.play_circle_outline,
+                            Icons.open_in_new_outlined,
                             color: isDark ? Colors.white70 : Colors.black87,
                           ),
                           title: Text(
-                            'Auto open details',
+                            'Auto-open details',
                             style: TextStyle(
                               color: isDark ? Colors.white : Colors.black87,
                             ),
                           ),
                           subtitle: Text(
-                            'After AI matches a title, open info page automatically.',
+                            'Open info page right after AI identifies a movie.',
                             style: TextStyle(
                               color: isDark ? Colors.white60 : Colors.black54,
                             ),
                           ),
                           value: _autoOpenInfoPage,
                           onChanged: (value) {
-                            setState(() => _autoOpenInfoPage = value);
+                            setState(() {
+                              _autoOpenInfoPage = value;
+                            });
                           },
+                          activeThumbColor: Colors.deepPurpleAccent,
                         ),
                         Divider(
                           height: 1,
@@ -250,29 +124,33 @@ class _SettingsPageState extends State<SettingsPage> {
                               ? Colors.white.withOpacity(0.1)
                               : Colors.black.withOpacity(0.1),
                         ),
+                        // Snackbar notifications
                         SwitchListTile(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
                           secondary: Icon(
-                            Icons.notifications_active_outlined,
+                            Icons.notifications_outlined,
                             color: isDark ? Colors.white70 : Colors.black87,
                           ),
                           title: Text(
-                            'Show snackbars',
+                            'Snackbar notifications',
                             style: TextStyle(
                               color: isDark ? Colors.white : Colors.black87,
                             ),
                           ),
                           subtitle: Text(
-                            'Keep small feedback messages like "Added to library ✅".',
+                            'Show quick messages for actions like adding to library.',
                             style: TextStyle(
                               color: isDark ? Colors.white60 : Colors.black54,
                             ),
                           ),
                           value: _showSnackbars,
                           onChanged: (value) {
-                            setState(() => _showSnackbars = value);
+                            setState(() {
+                              _showSnackbars = value;
+                            });
                           },
+                          activeThumbColor: Colors.deepPurpleAccent,
                         ),
                       ],
                     ),
@@ -280,76 +158,48 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   const SizedBox(height: 20),
 
-                  // === AI & UPLOAD ===
-                  _sectionTitle('AI & Upload', isDark),
+                  // === DEVELOPER ===
+                  _sectionTitle('Developer', isDark),
                   const SizedBox(height: 8),
                   _glassCard(
                     isDark: isDark,
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          secondary: Icon(
-                            Icons.smart_toy_outlined,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                          title: Text(
-                            'Detailed AI logs',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Show more detailed status & error messages while analyzing.',
-                            style: TextStyle(
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                          ),
-                          value: _showAiLogs,
-                          onChanged: (value) {
-                            setState(() => _showAiLogs = value);
-                          },
+                    child: SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      secondary: Icon(
+                        Icons.code_outlined,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                      title: Text(
+                        'Show AI debug logs',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
-                        Divider(
-                          height: 1,
-                          color: isDark
-                              ? Colors.white.withOpacity(0.1)
-                              : Colors.black.withOpacity(0.1),
+                      ),
+                      subtitle: Text(
+                        'See what the AI is saying under the hood.',
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : Colors.black54,
                         ),
-                        ListTile(
-                          leading: Icon(
-                            Icons.history,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                          title: Text(
-                            'Manage upload history',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
+                      ),
+                      value: _showAiLogs,
+                      onChanged: (value) {
+                        setState(() {
+                          _showAiLogs = value;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _showAiLogs
+                                  ? 'AI logs will be printed to console.'
+                                  : 'AI logs will be hidden.',
                             ),
+                            duration: const Duration(seconds: 2),
+                            backgroundColor: const Color(0xFF6A0DAD),
                           ),
-                          subtitle: Text(
-                            'Long-press items in History (Upload tab) to delete them.',
-                            style: TextStyle(
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                          ),
-                          trailing: Icon(
-                            Icons.chevron_right,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Go to Upload tab → long-press on posters to delete.',
-                                ),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        );
+                      },
+                      activeThumbColor: Colors.deepPurpleAccent,
                     ),
                   ),
 
@@ -385,10 +235,11 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                           onTap: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
+                              SnackBar(
+                                content: const Text(
                                     'Open Profile tab to manage your account.'),
-                                duration: Duration(seconds: 2),
+                                duration: const Duration(seconds: 2),
+                                backgroundColor: const Color(0xFF6A0DAD),
                               ),
                             );
                           },
@@ -527,21 +378,6 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
       child: child,
-    );
-  }
-
-  Widget _accentDot(Color color, {bool isSelected = true}) {
-    return Container(
-      width: isSelected ? 16 : 14,
-      height: isSelected ? 16 : 14,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        border: Border.all(
-          color: isSelected ? Colors.white : Colors.transparent,
-          width: 2,
-        ),
-      ),
     );
   }
 }
