@@ -227,29 +227,26 @@ class _LibraryPageState extends State<LibraryPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.list_alt_outlined,
-              size: 64,
-              color: isDark
-                  ? Colors.white.withOpacity(0.7)
-                  : Colors.black.withOpacity(0.6),
+              Icons.video_library_outlined,
+              size: 80,
+              color: isDark ? Colors.white24 : Colors.black26,
             ),
             const SizedBox(height: 16),
             Text(
               'No lists yet',
-              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Create lists to organize your movies.',
+              'Create your first list to organize your favorite movies and TV shows',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isDark ? Colors.white70 : Colors.black54,
+                color: isDark ? Colors.white60 : Colors.black54,
               ),
             ),
           ],
@@ -263,173 +260,165 @@ class _LibraryPageState extends State<LibraryPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final paddingTop = MediaQuery.of(context).padding.top;
 
-    return Container(
-      decoration: BoxDecoration(color: isDark ? Colors.black : Colors.white),
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: Column(
-          children: [
-            // Header with CineHolmes title - Instagram style gradient
-            Container(
-              color: Colors.transparent,
-              height: paddingTop + 60,
-              padding: EdgeInsets.only(top: paddingTop),
-              alignment: Alignment.center,
-              child: ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: const Text(
-                  'CineHolmes',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Billabong',
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+      body: Column(
+        children: [
+          // Instagram-style header with CineHolmes title (matching HomePage)
+          Container(
+            color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+            padding: EdgeInsets.only(top: paddingTop),
+            child: Column(
+              children: [
+                // CineHolmes title (same as HomePage)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      'CineHolmes',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w400,
+                        fontFamily: 'Pacifico',
+                        color: Colors.white,
+                        letterSpacing: 0,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-
-            // Content
-            Expanded(
-              child: Column(
-                children: [
-                  // Lists title and sort button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Lists',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
+                
+                // Section title
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'My Lists',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.sort,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Create new list button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: GestureDetector(
-                      onTap: _showCreateListDialog,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF6A0DAD),
-                              Color(0xFF9D4EDD),
-                            ],
+                            colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
                           ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6A0DAD).withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Center(
-                          child: Text(
-                            'CREATE A NEW LIST',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _showCreateListDialog,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.add,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'New List',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-
-                  // Lists
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: _firestore
-                          .collection('users')
-                          .doc(userId)
-                          .collection('lists')
-                          .orderBy('createdAt', descending: true)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text(
-                              'An error occurred',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                          );
-                        }
-
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF6A0DAD),
-                            ),
-                          );
-                        }
-
-                        final lists = snapshot.data?.docs ?? [];
-
-                        if (lists.isEmpty) {
-                          return _buildEmptyState(isDark: isDark);
-                        }
-
-                        return ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          itemCount: lists.length,
-                          itemBuilder: (context, index) {
-                            final listData =
-                                lists[index].data() as Map<String, dynamic>;
-                            final listId = lists[index].id;
-                            final listName = listData['name'] ?? 'Unnamed List';
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: _buildListCard(listId, listName, isDark),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                
+                // Divider
+                Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.black.withOpacity(0.1),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          // Lists
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(userId)
+                  .collection('lists')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'An error occurred',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF6A0DAD),
+                    ),
+                  );
+                }
+
+                final lists = snapshot.data?.docs ?? [];
+
+                if (lists.isEmpty) {
+                  return _buildEmptyState(isDark: isDark);
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  itemCount: lists.length,
+                  itemBuilder: (context, index) {
+                    final listData =
+                        lists[index].data() as Map<String, dynamic>;
+                    final listId = lists[index].id;
+                    final listName = listData['name'] ?? 'Unnamed List';
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildListCard(listId, listName, isDark),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -462,6 +451,13 @@ class _LibraryPageState extends State<LibraryPage> {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Stack(
               children: [
