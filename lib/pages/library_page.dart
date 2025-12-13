@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../home_main.dart';
-import 'list_view.dart'; // <-- detay sayfası burada
+import 'list_view.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -19,7 +19,6 @@ class _LibraryPageState extends State<LibraryPage> {
 
   String get userId => _auth.currentUser?.uid ?? '';
 
-  // Yeni liste oluştur
   Future<void> _createNewList(String listName) async {
     try {
       await _firestore.collection('users').doc(userId).collection('lists').add({
@@ -33,6 +32,7 @@ class _LibraryPageState extends State<LibraryPage> {
           SnackBar(
             content: Text('List created: $listName'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -42,16 +42,16 @@ class _LibraryPageState extends State<LibraryPage> {
           SnackBar(
             content: Text('Error: $e'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
   }
 
-  // Yeni liste dialog
   void _showCreateListDialog() {
     final TextEditingController controller = TextEditingController();
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
@@ -71,7 +71,7 @@ class _LibraryPageState extends State<LibraryPage> {
               borderSide: BorderSide(color: Colors.grey),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFFFC107)),
+              borderSide: BorderSide(color: Color(0xFF6A0DAD)),
             ),
           ),
         ),
@@ -89,7 +89,7 @@ class _LibraryPageState extends State<LibraryPage> {
             },
             child: const Text(
               'Create',
-              style: TextStyle(color: Color(0xFFFFC107)),
+              style: TextStyle(color: Color(0xFF6A0DAD)),
             ),
           ),
         ],
@@ -97,12 +97,12 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  // Liste sil
   Future<void> _deleteList(String listId, String listName) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
-        final isDark = Provider.of<ThemeProvider>(context).isDark;
         return AlertDialog(
           backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
           title: Text(
@@ -142,6 +142,7 @@ class _LibraryPageState extends State<LibraryPage> {
             SnackBar(
               content: Text('$listName deleted'),
               duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -151,6 +152,7 @@ class _LibraryPageState extends State<LibraryPage> {
             SnackBar(
               content: Text('Error: $e'),
               duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -158,13 +160,13 @@ class _LibraryPageState extends State<LibraryPage> {
     }
   }
 
-  // Liste seçenekleri menüsü (3 nokta)
   void _showListOptions(String listId, String listName) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final isDark = Provider.of<ThemeProvider>(context).isDark;
         return Container(
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
@@ -196,7 +198,6 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: İsim düzenleme istersek buraya yazacağız
                 },
               ),
               ListTile(
@@ -259,133 +260,175 @@ class _LibraryPageState extends State<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Provider.of<ThemeProvider>(context).isDark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final paddingTop = MediaQuery.of(context).padding.top;
 
     return Container(
       decoration: BoxDecoration(color: isDark ? Colors.black : Colors.white),
       child: SafeArea(
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Column(
-            children: [
-              // Başlık ve Sort butonu (geri tuşu YOK)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Lists',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.sort,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      onPressed: () {
-                        // İleride sıralama eklenebilir
-                      },
-                    ),
-                  ],
+        top: false,
+        bottom: false,
+        child: Column(
+          children: [
+            // Header with CineHolmes title - Instagram style gradient
+            Container(
+              color: Colors.transparent,
+              height: paddingTop + 60,
+              padding: EdgeInsets.only(top: paddingTop),
+              alignment: Alignment.center,
+              child: ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ).createShader(bounds),
+                child: const Text(
+                  'CineHolmes',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Billabong',
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
+            ),
 
-              // Yeni Liste Oluştur Butonu
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: GestureDetector(
-                  onTap: _showCreateListDialog,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFC107),
-                      borderRadius: BorderRadius.circular(12),
+            // Content
+            Expanded(
+              child: Column(
+                children: [
+                  // Lists title and sort button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
                     ),
-                    child: const Center(
-                      child: Text(
-                        'CREATE A NEW LIST',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Lists',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.sort,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          onPressed: () {},
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Create new list button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: GestureDetector(
+                      onTap: _showCreateListDialog,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF6A0DAD),
+                              Color(0xFF9D4EDD),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6A0DAD).withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'CREATE A NEW LIST',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // Listeler
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: _firestore
-                      .collection('users')
-                      .doc(userId)
-                      .collection('lists')
-                      .orderBy('createdAt', descending: true)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'An error occurred',
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
+                  // Lists
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: _firestore
+                          .collection('users')
+                          .doc(userId)
+                          .collection('lists')
+                          .orderBy('createdAt', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text(
+                              'An error occurred',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          );
+                        }
+
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF6A0DAD),
+                            ),
+                          );
+                        }
+
+                        final lists = snapshot.data?.docs ?? [];
+
+                        if (lists.isEmpty) {
+                          return _buildEmptyState(isDark: isDark);
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                        ),
-                      );
-                    }
+                          itemCount: lists.length,
+                          itemBuilder: (context, index) {
+                            final listData =
+                                lists[index].data() as Map<String, dynamic>;
+                            final listId = lists[index].id;
+                            final listName = listData['name'] ?? 'Unnamed List';
 
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFFFFC107),
-                        ),
-                      );
-                    }
-
-                    final lists = snapshot.data?.docs ?? [];
-
-                    if (lists.isEmpty) {
-                      return _buildEmptyState(isDark: isDark);
-                    }
-
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      itemCount: lists.length,
-                      itemBuilder: (context, index) {
-                        final listData =
-                            lists[index].data() as Map<String, dynamic>;
-                        final listId = lists[index].id;
-                        final listName = listData['name'] ?? 'Unnamed List';
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: _buildListCard(listId, listName, isDark),
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: _buildListCard(listId, listName, isDark),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -472,7 +515,6 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                   )
                 else
-                  // Empty state
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(
@@ -508,7 +550,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ),
 
-                // Liste adı
+                // List name
                 Positioned(
                   bottom: 16,
                   left: 16,
@@ -525,7 +567,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ),
 
-                // Üç nokta menü butonu
+                // More options button
                 Positioned(
                   top: 8,
                   right: 8,

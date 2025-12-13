@@ -15,12 +15,11 @@ class _HomePageState extends State<HomePage> {
   final tmdb = TMDBService();
 
   bool _loading = true;
-  int _currentTabIndex = 0; // 0 = Films, 1 = TV Shows
+  int _currentTabIndex = 0;
 
   List<Map<String, dynamic>> _movies = [];
   List<Map<String, dynamic>> _tvShows = [];
 
-  // --- Search state ---
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   bool _searching = false;
@@ -40,7 +39,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadTrending() async {
-    final data = await tmdb.fetchTrending(); // movie + tv karışık
+    final data = await tmdb.fetchTrending();
     if (!mounted) return;
 
     final movies = <Map<String, dynamic>>[];
@@ -61,8 +60,6 @@ class _HomePageState extends State<HomePage> {
       _loading = false;
     });
   }
-
-  // --- Search logic ---
 
   void _onSearchChanged(String value) {
     final query = value.trim();
@@ -111,29 +108,43 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final paddingTop = MediaQuery.of(context).padding.top;
+
     return DefaultTabController(
       length: 2,
       initialIndex: _currentTabIndex,
       child: Column(
         children: [
-          // ÜST SİYAH HEADER (CineHolmes + TabBar)
+          // Instagram-style header with tabs
           Container(
-            color: Colors.black,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top, // status bar
-              bottom: 8,
-            ),
+            color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+            padding: EdgeInsets.only(top: paddingTop),
             child: Column(
               children: [
-                const SizedBox(height: 6),
-                const Text(
-                  'CineHolmes',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                // CineHolmes title
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      'CineHolmes',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w400,
+                        fontFamily: 'Pacifico',
+                        color: Colors.white,
+                        letterSpacing: 0,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                
+                // TabBar
                 TabBar(
                   onTap: (index) {
                     setState(() {
@@ -148,8 +159,8 @@ class _HomePageState extends State<HomePage> {
                     Tab(text: 'Films'),
                     Tab(text: 'TV Shows'),
                   ],
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
+                  labelColor: isDark ? Colors.white : Colors.black87,
+                  unselectedLabelColor: isDark ? Colors.white70 : Colors.black54,
                   labelStyle: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -164,7 +175,7 @@ class _HomePageState extends State<HomePage> {
                   indicator: const UnderlineTabIndicator(
                     borderSide: BorderSide(
                       width: 3,
-                      color: Color(0xFF00D474), // yeşil çizgi
+                      color: Color(0xFF6A0DAD),
                     ),
                     insets: EdgeInsets.symmetric(horizontal: 24),
                   ),
@@ -174,15 +185,14 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // ALTTAKİ KOYU GRİ ALAN
           Expanded(
             child: Container(
-              color: const Color(0xFF202227), // gri arka plan
+              color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : RefreshIndicator(
                       onRefresh: _loadTrending,
-                      child: _buildScrollableContent(),
+                      child: _buildScrollableContent(isDark),
                     ),
             ),
           ),
@@ -191,7 +201,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildScrollableContent() {
+  Widget _buildScrollableContent(bool isDark) {
     final items = _currentTabIndex == 0 ? _movies : _tvShows;
     final hintText =
         _currentTabIndex == 0 ? 'Search films' : 'Search TV shows';
@@ -203,29 +213,43 @@ class _HomePageState extends State<HomePage> {
         // Search bar
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF2A2C31),
+            color: isDark
+                ? Colors.white.withOpacity(0.05)
+                : Colors.black.withOpacity(0.05),
             borderRadius: BorderRadius.circular(24),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              const Icon(Icons.search, color: Colors.white70, size: 20),
+              Icon(
+                Icons.search,
+                color: isDark ? Colors.white70 : Colors.black54,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _searchController,
                   onChanged: _onSearchChanged,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                   decoration: InputDecoration(
                     hintText: hintText,
-                    hintStyle: const TextStyle(color: Colors.white54),
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.black45,
+                    ),
                     border: InputBorder.none,
                   ),
                 ),
               ),
               if (_searchController.text.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18, color: Colors.white60),
+                  icon: Icon(
+                    Icons.close,
+                    size: 18,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
                   onPressed: _clearSearch,
                   splashRadius: 18,
                 ),
@@ -236,7 +260,6 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 16),
 
         if (isSearching) ...[
-          // SEARCH MODE
           if (_searching)
             const Center(
               child: Padding(
@@ -245,12 +268,14 @@ class _HomePageState extends State<HomePage> {
               ),
             )
           else if (_searchResults.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 24),
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
               child: Center(
                 child: Text(
                   'No results found.',
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
                 ),
               ),
             )
@@ -258,12 +283,12 @@ class _HomePageState extends State<HomePage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Results',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -271,23 +296,24 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
         ] else ...[
-          // TRENDING MODE
-          const Text(
+          Text(
             'Popular this week',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: isDark ? Colors.white : Colors.black87,
             ),
           ),
           const SizedBox(height: 10),
           if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40.0),
+            Padding(
+              padding: const EdgeInsets.only(top: 40.0),
               child: Center(
                 child: Text(
                   'No titles found for this week.',
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
                 ),
               ),
             )
@@ -352,11 +378,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Letterboxd tarzı search sonucu satırı
   Widget _buildSearchTile(Map<String, dynamic> item) {
     final poster = item['poster'] as String? ?? '';
     final title = (item['title'] ?? '') as String;
     final year = (item['year'] ?? '').toString();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(
       onTap: () {
@@ -412,19 +438,19 @@ class _HomePageState extends State<HomePage> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 2),
                   if (year.isNotEmpty)
                     Text(
                       year,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: Colors.white70,
+                        color: isDark ? Colors.white70 : Colors.black54,
                       ),
                     ),
                 ],

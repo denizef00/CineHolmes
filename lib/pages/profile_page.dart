@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 📋 Email kopyalamak için
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cineholmes/screens/login_page.dart';
 import '../services/auth_service.dart';
@@ -15,7 +15,7 @@ class _ProfilePageState extends State<ProfilePage> {
   User? _currentUser;
   final AuthService _authService = AuthService();
 
-  bool _loading = true; // 🔹 Yüklenme durumu
+  bool _loading = true;
 
   @override
   void initState() {
@@ -53,86 +53,152 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_currentUser == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.person_off, size: 60),
-              const SizedBox(height: 12),
-              const Text(
-                "No user is currently logged in.",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => LoginPage()),
-                    (route) => false,
-                  );
-                },
-                child: const Text("Go to Login"),
-              ),
-            ],
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_off,
+                  size: 60,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "No user is currently logged in.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => LoginPage()),
+                      (route) => false,
+                    );
+                  },
+                  child: const Text("Go to Login"),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // 🔹 HEADER (gradient + avatar + username + email + chip)
-          _buildProfileHeader(theme),
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Instagram-style header
+            _buildInstagramHeader(isDark),
+            
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Profile header
+                    _buildProfileHeader(theme, isDark),
 
-          const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-          // 🔹 ACCOUNT CARD
-          _buildAccountCard(theme),
+                    // Account card
+                    _buildAccountCard(theme, isDark),
 
-          const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-          // 🔹 SECURITY CARD
-          _buildSecurityCard(theme),
+                    // Security card
+                    _buildSecurityCard(theme, isDark),
 
-          const SizedBox(height: 30),
+                    const SizedBox(height: 30),
 
-          // 🔹 LOGOUT BUTTON
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ElevatedButton.icon(
-              onPressed: _handleLogout,
-              icon: const Icon(Icons.logout),
-              label: const Text('Log Out'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                    // Logout button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ElevatedButton.icon(
+                        onPressed: _handleLogout,
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Log Out'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Instagram-style header
+  Widget _buildInstagramHeader(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+            width: 0.5,
           ),
-          const SizedBox(height: 10),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            child: const Text(
+              'CineHolmes',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w400,
+                fontFamily: 'Pacifico',
+                color: Colors.white,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // 🔹 HEADER
-  Widget _buildProfileHeader(ThemeData theme) {
+  // Profile header
+  Widget _buildProfileHeader(ThemeData theme, bool isDark) {
     final gradientColors = [
       const Color(0xFF6A0DAD),
       const Color(0xFF9D4EDD),
@@ -186,7 +252,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(width: 16),
-          // İsim + email + chip
+          // Name + email + chip
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,26 +302,23 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // 🔹 ACCOUNT CARD
-  Widget _buildAccountCard(ThemeData theme) {
-    final cardColor =
-        theme.colorScheme.surface.withOpacity(theme.brightness == Brightness.dark ? 0.9 : 1.0);
-
+  // Account card
+  Widget _buildAccountCard(ThemeData theme, bool isDark) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: cardColor,
+        color: isDark 
+            ? Colors.white.withOpacity(0.05)
+            : Colors.black.withOpacity(0.03),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.white.withOpacity(
-            theme.brightness == Brightness.dark ? 0.05 : 0.08,
-          ),
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.08),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(
-              theme.brightness == Brightness.dark ? 0.4 : 0.1,
-            ),
+            color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -266,25 +329,48 @@ class _ProfilePageState extends State<ProfilePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Title
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Text(
               "Account",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
           ),
-          const Divider(height: 8),
+          Divider(
+            height: 8,
+            color: isDark
+                ? Colors.white.withOpacity(0.1)
+                : Colors.black.withOpacity(0.1),
+          ),
 
           // Email Row
           ListTile(
-            leading: const Icon(Icons.email_outlined),
-            title: const Text("Email"),
-            subtitle: Text(email),
+            leading: Icon(
+              Icons.email_outlined,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+            title: Text(
+              "Email",
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            subtitle: Text(
+              email,
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
             trailing: IconButton(
-              icon: const Icon(Icons.copy, size: 20),
+              icon: Icon(
+                Icons.copy,
+                size: 20,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: email));
                 if (mounted) {
@@ -301,11 +387,27 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Username Row
           ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: const Text("Username"),
-            subtitle: Text(username),
+            leading: Icon(
+              Icons.person_outline,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+            title: Text(
+              "Username",
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            subtitle: Text(
+              username,
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
             trailing: IconButton(
-              icon: const Icon(Icons.edit),
+              icon: Icon(
+                Icons.edit,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
               onPressed: _showChangeUsernameDialog,
             ),
           ),
@@ -314,26 +416,23 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // 🔹 SECURITY CARD
-  Widget _buildSecurityCard(ThemeData theme) {
-    final cardColor =
-        theme.colorScheme.surface.withOpacity(theme.brightness == Brightness.dark ? 0.9 : 1.0);
-
+  // Security card
+  Widget _buildSecurityCard(ThemeData theme, bool isDark) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: cardColor,
+        color: isDark 
+            ? Colors.white.withOpacity(0.05)
+            : Colors.black.withOpacity(0.03),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.white.withOpacity(
-            theme.brightness == Brightness.dark ? 0.05 : 0.08,
-          ),
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.08),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(
-              theme.brightness == Brightness.dark ? 0.4 : 0.1,
-            ),
+            color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -343,33 +442,65 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Text(
               "Security",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
           ),
-          const Divider(height: 8),
+          Divider(
+            height: 8,
+            color: isDark
+                ? Colors.white.withOpacity(0.1)
+                : Colors.black.withOpacity(0.1),
+          ),
 
           if (isEmailPasswordUser)
             ListTile(
-              leading: const Icon(Icons.lock_outline),
-              title: const Text("Change Password"),
-              subtitle:
-                  const Text("Update your account password securely."),
+              leading: Icon(
+                Icons.lock_outline,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+              title: Text(
+                "Change Password",
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              subtitle: Text(
+                "Update your account password securely.",
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
               onTap: _showChangePasswordDialog,
-              trailing: const Icon(Icons.chevron_right),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
             )
           else
             ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text("Password Managed Externally"),
-              subtitle: const Text(
+              leading: Icon(
+                Icons.info_outline,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+              title: Text(
+                "Password Managed Externally",
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              subtitle: Text(
                 "You signed in with a social provider. Please manage your password from your Google / Apple / provider account.",
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
               ),
             ),
         ],
@@ -377,7 +508,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // 🔹 LOGOUT
+  // Logout
   Future<void> _handleLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -428,7 +559,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // 🔹 USERNAME DİYALOĞU
+  // Username dialog
   void _showChangeUsernameDialog() {
     String newUsername = username;
     final controller = TextEditingController(text: username);
@@ -480,7 +611,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // 🔹 PASSWORD DİYALOĞU
+  // Password dialog
   void _showChangePasswordDialog() {
     if (!isEmailPasswordUser) {
       ScaffoldMessenger.of(context).showSnackBar(
