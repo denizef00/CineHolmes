@@ -1,3 +1,5 @@
+import 'package:cineholmes/screens/forget_page.dart';
+import 'package:cineholmes/screens/signup_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../home_main.dart';
@@ -69,6 +71,41 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your email address")),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
+      );
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Email sent"),
+          content: const Text(
+            "Password reset link has been sent to your email.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "Something went wrong")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,7 +125,9 @@ class _LoginPageState extends State<LoginPage> {
         child: Center(
           child: Container(
             padding: const EdgeInsets.all(20), // 🔧 daha küçük padding
-            margin: const EdgeInsets.symmetric(horizontal: 40), // 🔧 kutu daraldı
+            margin: const EdgeInsets.symmetric(
+              horizontal: 40,
+            ), // 🔧 kutu daraldı
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.1),
               borderRadius: BorderRadius.circular(16), // 🔧 daha küçük radius
@@ -138,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 10),
 
-                // 🔧 İnce Remember Me
+                // Remember Me
                 Row(
                   children: [
                     Checkbox(
@@ -148,11 +187,26 @@ class _LoginPageState extends State<LoginPage> {
                       activeColor: Colors.deepPurpleAccent,
                       checkColor: Colors.white,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact, // daha ince
                     ),
                     const Text(
                       "Remember Me",
                       style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+
+                    SizedBox(width: 0),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ForgotPage(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        "Forgot password?",
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
                     ),
                   ],
                 ),
@@ -162,14 +216,17 @@ class _LoginPageState extends State<LoginPage> {
                 if (_errorMessage != null)
                   Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13,
+                    ),
                   ),
                 const SizedBox(height: 8),
 
                 ElevatedButton(
                   onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurpleAccent.shade100,
+                    backgroundColor: const Color(0xFF6A0DAD),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 40,
                       vertical: 12,
@@ -187,13 +244,33 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
 
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SignUpPage(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    "Don't have an account? Sign up",
+                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
                 // 🔥 Google Sign-In butonu
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _handleGoogleSignIn,
-                    icon: const Icon(Icons.g_mobiledata,
-                        color: Colors.white, size: 26),
+                    icon: const Icon(
+                      Icons.g_mobiledata,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                     label: const Text(
                       "Continue with Google",
                       style: TextStyle(fontSize: 15, color: Colors.white),

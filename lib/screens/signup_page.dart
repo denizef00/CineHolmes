@@ -100,44 +100,6 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // 👇 YENİ FONKSİYONLAR - FACEBOOK
-  Future<void> _handleFacebookSignUp() async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential = await _authService.signInWithFacebook();
-      if (userCredential != null && mounted) {
-        // AuthWrapper otomatik olarak home'a yönlendirecek
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // 👇 YENİ FONKSİYONLAR - APPLE
-  Future<void> _handleAppleSignUp() async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential = await _authService.signInWithApple();
-      if (userCredential != null && mounted) {
-        // AuthWrapper otomatik olarak home'a yönlendirecek
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -289,28 +251,6 @@ class _SignUpPageState extends State<SignUpPage> {
                           onPressed: _isLoading ? null : _handleGoogleSignUp,
                           icon: const FaIcon(
                             FontAwesomeIcons.google,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.white24,
-                        child: IconButton(
-                          onPressed: _isLoading ? null : _handleFacebookSignUp,
-                          icon: const FaIcon(
-                            FontAwesomeIcons.facebook,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.white24,
-                        child: IconButton(
-                          onPressed: _isLoading ? null : _handleAppleSignUp,
-                          icon: const FaIcon(
-                            FontAwesomeIcons.apple,
                             color: Colors.white,
                           ),
                         ),
