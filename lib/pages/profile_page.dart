@@ -14,8 +14,19 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   User? _currentUser;
   final AuthService _authService = AuthService();
-
   bool _loading = true;
+
+  // 1. Avatar Asset Yollarının Tanımlanması
+  final List<String> _avatarAssets = const [
+    'assets/avatars/AAGRBT0C7xk_1765710192725.png',
+    'assets/avatars/AAGRBT0C7xk_1765710192730.png',
+    'assets/avatars/AAGRBT0C7xk_1765710388485.png',
+    'assets/avatars/AAGRBT0C7xk_1765710388489.png',
+    'assets/avatars/AAGRBT0C7xk_1765710388506.png',
+    'assets/avatars/AAGRBT0C7xk_1765710568040.png',
+    'assets/avatars/AAGRBT0C7xk_1765710568053.png',
+    'assets/avatars/AAGRBT0C7xk_1765710568056.png',
+  ];
 
   @override
   void initState() {
@@ -47,6 +58,79 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_currentUser == null) return false;
     return _currentUser!.providerData.any(
       (info) => info.providerId == 'password',
+    );
+  }
+
+  // Profil fotoğrafını Firebase'de güncelleyen metot
+  Future<void> _updateProfilePicture(String newAssetPath) async {
+    try {
+      await _currentUser?.updatePhotoURL(newAssetPath);
+      await _loadUserData(); 
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully! ✅',style: TextStyle(color: Colors.white),),backgroundColor: Color.fromARGB(255, 49, 49, 49),behavior: SnackBarBehavior.floating,));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating profile picture: $e',style: TextStyle(color: Colors.white),),backgroundColor: Color.fromARGB(255, 49, 49, 49),behavior: SnackBarBehavior.floating,));
+        
+      }
+    }
+  }
+
+  // Avatar seçimi için diyalog 
+  void _showAvatarSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Select New Profile Picture"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            shrinkWrap: true,
+            itemCount: _avatarAssets.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4, 
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemBuilder: (context, index) {
+              final assetPath = _avatarAssets[index];
+              
+              return GestureDetector(
+                onTap: () async {
+                  Navigator.pop(context); 
+                  await _updateProfilePicture(assetPath); 
+                },
+                // ClipOval ve BoxFit.cover kullanılarak resmin tam doldurulması sağlanıyor.
+                child: ClipOval(
+                  child: Container(
+                    // Boyut 90'a çıkarıldı.
+                    width: 90,  
+                    height: 90, 
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      border: Border.all(color: Colors.black12, width: 1.0)
+                    ),
+                    child: Image.asset(
+                      assetPath,
+                      fit: BoxFit.cover, // Resmin kutuyu tam doldurması için
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
     );
   }
 
@@ -224,31 +308,39 @@ class _ProfilePageState extends State<ProfilePage> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       child: Row(
         children: [
-          // Avatar
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withOpacity(0.4),
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+          // Avatar (Dokunma alanı eklendi)
+          GestureDetector(
+            onTap: _showAvatarSelectionDialog,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.4),
+                  width: 2,
                 ),
-              ],
-            ),
-            child: CircleAvatar(
-              radius: 34,
-              backgroundImage: _currentUser?.photoURL != null
-                  ? NetworkImage(_currentUser!.photoURL!)
-                  : null,
-              backgroundColor: Colors.white.withOpacity(0.1),
-              child: _currentUser?.photoURL == null
-                  ? const Icon(Icons.person, size: 34, color: Colors.white)
-                  : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 40, // Boyut artırıldı
+                // Fotoğrafı yükleme mantığı
+                backgroundImage: _currentUser?.photoURL != null 
+                    // Eğer photoURL bir Asset yolu ile başlıyorsa (yani bizim kaydettiğimiz avatar ise)
+                    ? (_currentUser!.photoURL!.startsWith('assets/') 
+                        ? AssetImage(_currentUser!.photoURL!)
+                        : NetworkImage(_currentUser!.photoURL!)) // Aksi halde gerçek bir URL'dir
+                    : null,
+                
+                backgroundColor: Colors.white.withOpacity(0.1),
+                child: _currentUser?.photoURL == null
+                    ? const Icon(Icons.person, size: 34, color: Colors.white)
+                    : null,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -376,7 +468,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text("Email copied to clipboard."),
+                      content: Text("Email copied to clipboard.",style: TextStyle(color: Colors.white),),backgroundColor: Color.fromARGB(255, 49, 49, 49),behavior: SnackBarBehavior.floating,
                       duration: Duration(seconds: 1),
                     ),
                   );
@@ -583,25 +675,30 @@ class _ProfilePageState extends State<ProfilePage> {
           ElevatedButton(
             onPressed: () async {
               if (newUsername.isNotEmpty && newUsername != username) {
-                Navigator.pop(context);
+                
                 try {
                   await _currentUser?.updateDisplayName(newUsername);
                   await _loadUserData();
 
                   if (mounted) {
+                    Navigator.pop(context); // İşlem başarılı, dialog'u kapat
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Username Updated ✅')),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
+                    // Hata durumunda da dialog'u kapat
+                    if (Navigator.of(context).canPop()) {
+                       Navigator.pop(context); 
+                    }
                     ScaffoldMessenger.of(
                       context,
                     ).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 }
               } else {
-                Navigator.pop(context);
+                Navigator.pop(context); // Eğer isim değiştirilmediyse kapat
               }
             },
             child: const Text("Save"),
@@ -611,7 +708,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Password dialog
+  // Password dialog (FIXED - GÜVENLİK VE MESSAGING AKIŞI DÜZELTİLDİ)
   void _showChangePasswordDialog() {
     if (!isEmailPasswordUser) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -627,119 +724,209 @@ class _ProfilePageState extends State<ProfilePage> {
     String currentPassword = "";
     String newPassword = "";
     String confirmPassword = "";
+    String? errorMessage;
     final formKey = GlobalKey<FormState>();
+    final dialogContext = context; // Ana diyalog bağlamını sakla
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Change Password"),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                obscureText: true,
-                onChanged: (value) => currentPassword = value,
-                decoration: const InputDecoration(
-                  labelText: "Current Password",
-                  hintText: "Enter your current password.",
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text("Change Password"),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Hata mesajı gösterimi
+                if (errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 200, 199, 199),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color.fromARGB(255, 200, 199, 199)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                TextFormField(
+                  obscureText: true,
+                  onChanged: (value) {
+                    currentPassword = value;
+                    // Hata mesajı varsa, yeni girişle temizle
+                    if (errorMessage != null) {
+                      setState(() => errorMessage = null);
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    labelText: "Current Password",
+                    hintText: "Enter your current password.",
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Current password is required.';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Current password is required.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                obscureText: true,
-                onChanged: (value) => newPassword = value,
-                decoration: const InputDecoration(
-                  labelText: "New Password",
-                  hintText: "Enter your new password",
+                const SizedBox(height: 12),
+                TextFormField(
+                  obscureText: true,
+                  onChanged: (value) => newPassword = value,
+                  decoration: const InputDecoration(
+                    labelText: "New Password",
+                    hintText: "Enter your new password",
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'A new password is required';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be 6 characters minimum';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'A new password is required';
-                  }
-                  if (value.length < 6) {
-                    return 'Password must be 6 characters minimum';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                obscureText: true,
-                onChanged: (value) => confirmPassword = value,
-                decoration: const InputDecoration(
-                  labelText: "Confirm New Password",
-                  hintText: "Verify New Password",
+                const SizedBox(height: 12),
+                TextFormField(
+                  obscureText: true,
+                  onChanged: (value) => confirmPassword = value,
+                  decoration: const InputDecoration(
+                    labelText: "Confirm New Password",
+                    hintText: "Verify New Password",
+                  ),
+                  validator: (value) {
+                    if (value != newPassword) {
+                      return 'Passwords mismatch';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value != newPassword) {
-                    return 'Passwords mismatch';
-                  }
-                  return null;
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                try {
-                  final credential = EmailAuthProvider.credential(
-                    email: email,
-                    password: currentPassword,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  
+                  // 1. Yükleme Ekranını Göster
+                  showDialog(
+                    context: dialogContext, // Ana diyalog bağlamını kullan
+                    barrierDismissible: false,
+                    builder: (BuildContext loadingContext) {
+                      return Container(
+                        color: Colors.black54,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                      );
+                    },
                   );
-                  await _currentUser?.reauthenticateWithCredential(credential);
-                  await _currentUser?.updatePassword(newPassword);
 
-                  if (mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Password updated.✅')),
+                  try {
+                    // 1. Create authentication credential
+                    final credential = EmailAuthProvider.credential(
+                      email: email,
+                      password: currentPassword,
                     );
-                  }
-                } on FirebaseAuthException catch (e) {
-                  String errorMessage = 'Error';
-                  if (e.code == 'wrong-password') {
-                    errorMessage = 'Incorrect current password.';
-                  } else if (e.code == 'weak-password') {
-                    errorMessage = 'The password you entered is too weak';
-                  } else if (e.code == 'requires-recent-login') {
-                    errorMessage =
-                        'For security reasons, please re-authenticate.';
-                  }
+                    
+                    // 2. Reauthenticate with current password - This will throw error if password is wrong
+                    await _currentUser?.reauthenticateWithCredential(credential);
+                    
+                    // 3. If reauthentication successful, update password
+                    await _currentUser?.updatePassword(newPassword);
 
-                  if (mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(errorMessage)));
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    // BAŞARILI: Yükleme ve Diyalogları Kapat, SnackBar göster
+                    if (mounted) {
+                      // Yükleme Ekranını Kapat (rootNavigator: true ile en üstteki diyaloğu kapat)
+                      Navigator.of(dialogContext, rootNavigator: true).pop(); 
+                      // Şifre Değiştirme Diyaloğunu Kapat
+                      Navigator.of(dialogContext, rootNavigator: true).pop(); 
+                      
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Password updated successfully! ✅', style: TextStyle(color: Colors.white)),
+                          backgroundColor: Color.fromARGB(255, 49, 49, 49),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  } on FirebaseAuthException catch (e) {
+                    // HATA: Authentication failed
+                    String newErrorMessage = 'Unknown error';
+                    
+                    // Hata Kodu Kontrolü ve NET İngilizce Mesaj Ataması
+                    if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+                      newErrorMessage = 'The current password you entered is incorrect. Your password has NOT been changed.';
+                    } else if (e.code == 'weak-password') {
+                      newErrorMessage = 'The password you entered is too weak';
+                    } else if (e.code == 'requires-recent-login') {
+                      newErrorMessage = 'For security reasons, please log out and log in again.';
+                    } else {
+                      newErrorMessage = 'An error occurred: ${e.message}';
+                    }
+
+                    if (mounted) {
+                      // 3a. Yükleme Ekranını Kapat (Hata oluşsa bile)
+                      Navigator.of(dialogContext, rootNavigator: true).pop(); 
+                      
+                      // 3b. Diyalog içindeki hata mesajını güncelle (StatefulBuilder sayesinde)
+                      setState(() {
+                        errorMessage = newErrorMessage;
+                      });
+                      
+                      // 3c. SnackBar göster
+                      
+                    }
+                  } catch (e) {
+                    // GENEL HATA:
+                    if (mounted) {
+                      // Yükleme Ekranını Kapat
+                      Navigator.of(dialogContext, rootNavigator: true).pop();
+                      
+                      // Diyalog içindeki hata mesajını güncelle
+                      setState(() {
+                        errorMessage = 'An unexpected error occurred';
+                      });
+                      
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Error: $e', style: const TextStyle(color: Colors.white)),
+                          backgroundColor: Colors.red,
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
                   }
                 }
-              }
-            },
-            child: const Text("Change"),
-          ),
-        ],
+              },
+              child: const Text("Change"),
+            ),
+          ],
+        ),
       ),
     );
   }
