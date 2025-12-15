@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../home_main.dart';
 import 'list_view.dart';
 
 class LibraryPage extends StatefulWidget {
@@ -19,10 +17,28 @@ class _LibraryPageState extends State<LibraryPage> {
 
   String get userId => _auth.currentUser?.uid ?? '';
 
+  void _needLoginSnack() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please log in first.'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // -----------------------------
+  // CREATE LIST
+  // -----------------------------
   Future<void> _createNewList(String listName) async {
+    if (userId.isEmpty) {
+      if (mounted) _needLoginSnack();
+      return;
+    }
+
     try {
       await _firestore.collection('users').doc(userId).collection('lists').add({
-        'name': listName,
+        'name': listName.trim(),
         'createdAt': FieldValue.serverTimestamp(),
         'movieCount': 0,
       });
@@ -30,7 +46,7 @@ class _LibraryPageState extends State<LibraryPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('List created: $listName'),
+            content: Text('List created: ${listName.trim()}'),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -50,7 +66,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   void _showCreateListDialog() {
-    final TextEditingController controller = TextEditingController();
+    final controller = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
@@ -67,9 +83,8 @@ class _LibraryPageState extends State<LibraryPage> {
           decoration: const InputDecoration(
             hintText: 'List name',
             hintStyle: TextStyle(color: Colors.grey),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-            ),
+            enabledBorder:
+                UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: Color(0xFF6A0DAD)),
             ),
@@ -82,33 +97,121 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
           TextButton(
             onPressed: () {
-              if (controller.text.isNotEmpty) {
-                _createNewList(controller.text);
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                _createNewList(name);
                 Navigator.pop(context);
               }
             },
-            child: const Text(
-              'Create',
-              style: TextStyle(color: Color(0xFF6A0DAD)),
-            ),
+            child: const Text('Create',
+                style: TextStyle(color: Color(0xFF6A0DAD))),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _deleteList(String listId, String listName) async {
+  // -----------------------------
+  // RENAME LIST
+  // -----------------------------
+  Future<void> _renameList(String listId, String currentName) async {
+    if (userId.isEmpty) {
+      if (mounted) _needLoginSnack();
+      return;
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final controller = TextEditingController(text: currentName);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        title: Text(
+          'Edit List Name',
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          decoration: const InputDecoration(
+            hintText: 'New list name',
+            hintStyle: TextStyle(color: Colors.grey),
+            enabledBorder:
+                UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF6A0DAD)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              final v = controller.text.trim();
+              Navigator.pop(context, v.isEmpty ? null : v);
+            },
+            child:
+                const Text('Save', style: TextStyle(color: Color(0xFF6A0DAD))),
+          ),
+        ],
+      ),
+    );
+
+    if (newName == null || newName == currentName) return;
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .doc(listId)
+          .update({'name': newName});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('List name updated ✅'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  // -----------------------------
+  // DELETE LIST
+  // -----------------------------
+  Future<void> _deleteList(String listId, String listName) async {
+    if (userId.isEmpty) {
+      if (mounted) _needLoginSnack();
+      return;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
           backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          title: Text(
-            'Delete List',
-            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-          ),
+          title: Text('Delete List',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
           content: Text(
             'Are you sure you want to delete "$listName"?',
             style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
@@ -160,65 +263,83 @@ class _LibraryPageState extends State<LibraryPage> {
     }
   }
 
+  // -----------------------------
+  // LIST OPTIONS (BOTTOM SHEET)
+  // -----------------------------
   void _showListOptions(String listId, String listName) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      isScrollControlled: false,
+      builder: (sheetContext) {
+        final bottomInset = MediaQuery.of(sheetContext).padding.bottom;
+
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: Icon(
-                  Icons.edit,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-                title: Text(
-                  'Edit List Name',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                },
+                  const SizedBox(height: 8),
+
+                  ListTile(
+                    leading: Icon(
+                      Icons.edit,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    title: Text(
+                      'Edit List Name',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _renameList(listId, listName);
+                    },
+                  ),
+
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text('Delete List',
+                        style: TextStyle(color: Colors.red)),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _deleteList(listId, listName);
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text(
-                  'Delete List',
-                  style: TextStyle(color: Colors.red),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteList(listId, listName);
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
+  // -----------------------------
+  // UI HELPERS
+  // -----------------------------
   Widget _buildEmptyState({required bool isDark}) {
     return Center(
       child: Padding(
@@ -226,11 +347,8 @@ class _LibraryPageState extends State<LibraryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.video_library_outlined,
-              size: 80,
-              color: isDark ? Colors.white24 : Colors.black26,
-            ),
+            Icon(Icons.video_library_outlined,
+                size: 80, color: isDark ? Colors.white24 : Colors.black26),
             const SizedBox(height: 16),
             Text(
               'No lists yet',
@@ -255,22 +373,36 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
+  // -----------------------------
+  // BUILD
+  // -----------------------------
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final paddingTop = MediaQuery.of(context).padding.top;
 
+    if (userId.isEmpty) {
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        body: Center(
+          child: Text(
+            'Please log in to see your lists.',
+            style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
       body: Column(
         children: [
-          // Instagram-style header with CineHolmes title (matching HomePage)
+          // Header
           Container(
             color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
             padding: EdgeInsets.only(top: paddingTop),
             child: Column(
               children: [
-                // CineHolmes title (same as HomePage)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: ShaderMask(
@@ -286,13 +418,10 @@ class _LibraryPageState extends State<LibraryPage> {
                         fontWeight: FontWeight.w400,
                         fontFamily: 'Pacifico',
                         color: Colors.white,
-                        letterSpacing: 0,
                       ),
                     ),
                   ),
                 ),
-                
-                // Section title
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Row(
@@ -320,17 +449,12 @@ class _LibraryPageState extends State<LibraryPage> {
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
+                                  horizontal: 16, vertical: 8),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    Icons.add,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
+                                  Icon(Icons.add,
+                                      color: Colors.white, size: 20),
                                   SizedBox(width: 4),
                                   Text(
                                     'New List',
@@ -349,8 +473,6 @@ class _LibraryPageState extends State<LibraryPage> {
                     ],
                   ),
                 ),
-                
-                // Divider
                 Divider(
                   height: 1,
                   thickness: 0.5,
@@ -377,37 +499,29 @@ class _LibraryPageState extends State<LibraryPage> {
                     child: Text(
                       'An error occurred',
                       style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
+                          color: isDark ? Colors.white : Colors.black87),
                     ),
                   );
                 }
-
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF6A0DAD),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF6A0DAD)),
                   );
                 }
 
                 final lists = snapshot.data?.docs ?? [];
-
-                if (lists.isEmpty) {
-                  return _buildEmptyState(isDark: isDark);
-                }
+                if (lists.isEmpty) return _buildEmptyState(isDark: isDark);
 
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: lists.length,
                   itemBuilder: (context, index) {
                     final listData =
                         lists[index].data() as Map<String, dynamic>;
                     final listId = lists[index].id;
-                    final listName = listData['name'] ?? 'Unnamed List';
+                    final listName =
+                        (listData['name'] ?? 'Unnamed List').toString();
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
@@ -423,6 +537,9 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
+  // -----------------------------
+  // LIST CARD + COVER COLLAGE
+  // -----------------------------
   Widget _buildListCard(String listId, String listName, bool isDark) {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
@@ -450,142 +567,192 @@ class _LibraryPageState extends State<LibraryPage> {
             height: 200,
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(isDark ? 0.32 : 0.10),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                // Movie posters grid
-                if (movies.isNotEmpty)
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Stack(
+                children: [
+                  // Collage / Empty
                   Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: GridView.builder(
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 1.5,
-                        ),
-                        itemCount: movies.length > 4 ? 4 : movies.length,
-                        itemBuilder: (context, index) {
-                          final movieData =
-                              movies[index].data() as Map<String, dynamic>;
-                          final posterUrl = movieData['poster'] ?? '';
-
-                          return Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: isDark ? Colors.black : Colors.white,
-                                width: 0.5,
+                    child: movies.isNotEmpty
+                        ? _buildCoverCollage(movies, isDark)
+                        : Container(
+                            color: isDark
+                                ? const Color(0xFF2C2C2E)
+                                : Colors.grey.shade200,
+                            child: Center(
+                              child: Icon(
+                                Icons.movie_outlined,
+                                size: 48,
+                                color: Colors.grey.shade600,
                               ),
                             ),
-                            child: posterUrl.isNotEmpty
-                                ? Image.network(
-                                    posterUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.grey.shade800,
-                                      child: const Icon(
-                                        Icons.movie,
-                                        color: Colors.white54,
-                                      ),
-                                    ),
-                                  )
-                                : Container(
-                                    color: Colors.grey.shade800,
-                                    child: const Icon(
-                                      Icons.movie,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                          );
-                        },
-                      ),
-                    ),
-                  )
-                else
+                          ),
+                  ),
+
+                  // Gradient overlay for readability
                   Positioned.fill(
-                    child: Container(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF2C2C2E)
-                            : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.movie_outlined,
-                          size: 48,
-                          color: Colors.grey.shade600,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.18),
+                            Colors.black.withOpacity(0.05),
+                            Colors.black.withOpacity(0.75),
+                          ],
                         ),
                       ),
                     ),
                   ),
 
-                // Gradient overlay
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // List name
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 56,
-                  child: Text(
-                    listName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-
-                // More options button
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => _showListOptions(listId, listName),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.more_horiz,
+                  // List name
+                  Positioned(
+                    bottom: 14,
+                    left: 14,
+                    right: 64,
+                    child: Text(
+                      listName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                         color: Colors.white,
-                        size: 20,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  // More button
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Material(
+                      color: Colors.black.withOpacity(0.35),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => _showListOptions(listId, listName),
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.more_vert,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCoverCollage(List<QueryDocumentSnapshot> movies, bool isDark) {
+    // Always render 4 tiles (missing ones => placeholder)
+    final items = List.generate(4, (i) => i < movies.length ? movies[i] : null);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ratio = (constraints.maxWidth <= 0 || constraints.maxHeight <= 0)
+            ? 1.0
+            : (constraints.maxWidth / constraints.maxHeight);
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: ratio,
+          ),
+          itemCount: 4,
+          itemBuilder: (context, index) {
+            final doc = items[index];
+
+            if (doc == null) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2C2C2E) : Colors.grey.shade300,
+                  border: Border.all(
+                    color: isDark ? Colors.black.withOpacity(0.6) : Colors.white,
+                    width: 0.5,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(Icons.movie, color: Colors.white38, size: 28),
+                ),
+              );
+            }
+
+            final data = doc.data() as Map<String, dynamic>;
+
+            // Use backdrop if you store it, else fallback to poster
+            final backdrop = (data['backdrop'] ?? '').toString();
+            final poster = (data['poster'] ?? '').toString();
+            final imageUrl = backdrop.isNotEmpty ? backdrop : poster;
+
+            return Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: isDark ? Colors.black.withOpacity(0.6) : Colors.white,
+                  width: 0.5,
+                ),
+              ),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.medium,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: isDark
+                              ? const Color(0xFF2C2C2E)
+                              : Colors.grey.shade300,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => Container(
+                        color: isDark
+                            ? const Color(0xFF2C2C2E)
+                            : Colors.grey.shade300,
+                        child: const Center(
+                          child: Icon(Icons.broken_image,
+                              color: Colors.white38, size: 28),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: isDark
+                          ? const Color(0xFF2C2C2E)
+                          : Colors.grey.shade300,
+                      child: const Center(
+                        child:
+                            Icon(Icons.movie, color: Colors.white38, size: 28),
+                      ),
+                    ),
+            );
+          },
         );
       },
     );

@@ -727,6 +727,8 @@ class _InfoPageState extends State<InfoPage> {
   }
 }
 
+
+// Add to List Modal Widget (multi-select UI, write instantly, no pop)
 // Add to List Modal Widget
 class _AddToListModal extends StatefulWidget {
   final String movieId;

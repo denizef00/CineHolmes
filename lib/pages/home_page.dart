@@ -89,8 +89,7 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     final wantedType = _currentTabIndex == 0 ? 'movie' : 'tv';
-    final filtered =
-        all.where((m) => (m['type'] ?? '') == wantedType).toList();
+    final filtered = all.where((m) => (m['type'] ?? '') == wantedType).toList();
 
     setState(() {
       _searchResults = filtered;
@@ -111,106 +110,101 @@ class _HomePageState extends State<HomePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final paddingTop = MediaQuery.of(context).padding.top;
 
-    return DefaultTabController(
-      length: 2,
-      initialIndex: _currentTabIndex,
-      child: Column(
-        children: [
-          // Instagram-style header with tabs
-          Container(
-            color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-            padding: EdgeInsets.only(top: paddingTop),
-            child: Column(
-              children: [
-                // CineHolmes title
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ).createShader(bounds),
-                    child: const Text(
-                      'CineHolmes',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w400,
-                        fontFamily: 'Pacifico',
-                        color: Colors.white,
-                        letterSpacing: 0,
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+      body: DefaultTabController(
+        length: 2,
+        initialIndex: _currentTabIndex,
+        child: Column(
+          children: [
+            // Header + tabs
+            Container(
+              color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+              padding: EdgeInsets.only(top: paddingTop),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(bounds),
+                      child: const Text(
+                        'CineHolmes',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: 'Pacifico',
+                          color: Colors.white,
+                          letterSpacing: 0,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                
-                // TabBar
-                TabBar(
-                  onTap: (index) {
-                    setState(() {
-                      _currentTabIndex = index;
-                    });
-                    final q = _searchController.text.trim();
-                    if (q.isNotEmpty) {
-                      _performSearch(q);
-                    }
-                  },
-                  tabs: const [
-                    Tab(text: 'Films'),
-                    Tab(text: 'TV Shows'),
-                  ],
-                  labelColor: isDark ? Colors.white : Colors.black87,
-                  unselectedLabelColor: isDark ? Colors.white70 : Colors.black54,
-                  labelStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.2,
-                  ),
-                  indicatorSize: TabBarIndicatorSize.label,
-                  indicator: const UnderlineTabIndicator(
-                    borderSide: BorderSide(
-                      width: 3,
-                      color: Color(0xFF6A0DAD),
+                  TabBar(
+                    onTap: (index) {
+                      setState(() => _currentTabIndex = index);
+                      final q = _searchController.text.trim();
+                      if (q.isNotEmpty) _performSearch(q);
+                    },
+                    tabs: const [
+                      Tab(text: 'Films'),
+                      Tab(text: 'TV Shows'),
+                    ],
+                    labelColor: isDark ? Colors.white : Colors.black87,
+                    unselectedLabelColor:
+                        isDark ? Colors.white70 : Colors.black54,
+                    labelStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
                     ),
-                    insets: EdgeInsets.symmetric(horizontal: 24),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicator: const UnderlineTabIndicator(
+                      borderSide: BorderSide(
+                        width: 3,
+                        color: Color(0xFF6A0DAD),
+                      ),
+                      insets: EdgeInsets.symmetric(horizontal: 24),
+                    ),
+                    dividerColor: Colors.transparent,
                   ),
-                  dividerColor: Colors.transparent,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          Expanded(
-            child: Container(
-              color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: _loadTrending,
-                      child: _buildScrollableContent(isDark),
-                    ),
+            Expanded(
+              child: Container(
+                color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _loadTrending,
+                        child: _buildScrollableContent(isDark),
+                      ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildScrollableContent(bool isDark) {
     final items = _currentTabIndex == 0 ? _movies : _tvShows;
-    final hintText =
-        _currentTabIndex == 0 ? 'Search films' : 'Search TV shows';
+    final hintText = _currentTabIndex == 0 ? 'Search films' : 'Search TV shows';
     final isSearching = _searchController.text.trim().isNotEmpty;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
-        // Search bar
         Container(
           decoration: BoxDecoration(
             color: isDark
@@ -221,44 +215,35 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              Icon(
-                Icons.search,
-                color: isDark ? Colors.white70 : Colors.black54,
-                size: 20,
-              ),
+              Icon(Icons.search,
+                  color: isDark ? Colors.white70 : Colors.black54, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _searchController,
                   onChanged: _onSearchChanged,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: InputDecoration(
                     hintText: hintText,
                     hintStyle: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.black45,
-                    ),
+                        color: isDark ? Colors.white54 : Colors.black45),
                     border: InputBorder.none,
                   ),
                 ),
               ),
               if (_searchController.text.isNotEmpty)
                 IconButton(
-                  icon: Icon(
-                    Icons.close,
-                    size: 18,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
+                  icon: Icon(Icons.close,
+                      size: 18,
+                      color: isDark ? Colors.white60 : Colors.black54),
                   onPressed: _clearSearch,
                   splashRadius: 18,
                 ),
             ],
           ),
         ),
-
         const SizedBox(height: 16),
-
         if (isSearching) ...[
           if (_searching)
             const Center(
@@ -271,57 +256,46 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.only(top: 24),
               child: Center(
-                child: Text(
-                  'No results found.',
-                  style: TextStyle(
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                ),
+                child: Text('No results found.',
+                    style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black54)),
               ),
             )
           else
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Results',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
+                Text('Results',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black87,
+                    )),
                 const SizedBox(height: 8),
                 ..._searchResults.map(_buildSearchTile),
               ],
             ),
         ] else ...[
-          Text(
-            'Popular this week',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
+          Text('Popular this week',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black87,
+              )),
           const SizedBox(height: 10),
           if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 40.0),
               child: Center(
-                child: Text(
-                  'No titles found for this week.',
-                  style: TextStyle(
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                ),
+                child: Text('No titles found for this week.',
+                    style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black54)),
               ),
             )
           else
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
               itemCount: items.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
@@ -332,7 +306,6 @@ class _HomePageState extends State<HomePage> {
               itemBuilder: (context, index) {
                 final item = items[index];
                 final poster = item['poster'] as String? ?? '';
-
                 return GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -354,20 +327,14 @@ class _HomePageState extends State<HomePage> {
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
                               color: Colors.grey.shade800,
-                              child: const Icon(
-                                Icons.broken_image,
-                                color: Colors.white54,
-                                size: 24,
-                              ),
+                              child: const Icon(Icons.broken_image,
+                                  color: Colors.white54, size: 24),
                             ),
                           )
                         : Container(
                             color: Colors.grey.shade800,
-                            child: const Icon(
-                              Icons.movie,
-                              color: Colors.white54,
-                              size: 24,
-                            ),
+                            child: const Icon(Icons.movie,
+                                color: Colors.white54, size: 24),
                           ),
                   ),
                 );
@@ -412,20 +379,14 @@ class _HomePageState extends State<HomePage> {
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: Colors.grey.shade800,
-                          child: const Icon(
-                            Icons.broken_image,
-                            color: Colors.white54,
-                            size: 20,
-                          ),
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.white54, size: 20),
                         ),
                       )
                     : Container(
                         color: Colors.grey.shade800,
-                        child: const Icon(
-                          Icons.movie,
-                          color: Colors.white54,
-                          size: 20,
-                        ),
+                        child: const Icon(Icons.movie,
+                            color: Colors.white54, size: 20),
                       ),
               ),
             ),

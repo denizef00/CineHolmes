@@ -1,9 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
+// upload_page.dart (cleaned + more stable + no full RAM load on mobile)
+
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File; // only used on mobile/desktop (guarded by kIsWeb)
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,38 +26,64 @@ class UploadPage extends StatefulWidget {
   State<UploadPage> createState() => _UploadPageState();
 }
 
-class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateMixin {
+class _UploadPageState extends State<UploadPage>
+    with SingleTickerProviderStateMixin {
+  // --- deps ---
   final picker = ImagePicker();
-  late final TMDBService tmdbService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  String status = "No video selected yet.";
-  Map<String, dynamic>? movieData;
-  List<Map<String, dynamic>> history = [];
-  bool isPicking = false;
-  bool _isAnalyzing = false;
-  bool _isLoadingHistory = true;
-  
-  // Animation controller for pulse effect
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+  late final TMDBService tmdbService;
 
   String get apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
   String get tmdbApiKey => dotenv.env['TMDB_API_KEY'] ?? '';
+
+  // --- UI state ---
+  String status = "No video selected yet.";
+  Map<String, dynamic>? movieData;
+  List<Map<String, dynamic>> history = [];
+
+  bool isPicking = false;
+  bool _isAnalyzing = false;
+  bool _isLoadingHistory = true;
+
+  // prevent stale async updates
+  int _runId = 0;
+
+  // pulse animation
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  static const int _historyLimit = 20;
+  static const int _maxVideoMB = 100;
+
+  static const String _prompt = '''
+Identify this movie or TV series.
+Respond in this exact format:
+Title|Year|Type
+
+Where:
+- Title: The original English title
+- Year: Release year (4 digits, approximate if unsure)
+- Type: Either "movie" or "tv"
+
+Examples:
+"Inception|2010|movie"
+"Breaking Bad|2008|tv"
+"The Matrix|1999|movie"
+
+Return only that single line.''';
 
   @override
   void initState() {
     super.initState();
     tmdbService = TMDBService();
     _loadUserHistory();
-    
-    // Initialize pulse animation
+
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -63,11 +95,14 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  // ---------- FIRESTORE HISTORY ----------
+  // ----------------------------
+  // FIRESTORE HISTORY
+  // ----------------------------
 
   Future<void> _loadUserHistory() async {
     final user = _auth.currentUser;
     if (user == null) {
+      if (!mounted) return;
       setState(() => _isLoadingHistory = false);
       return;
     }
@@ -78,8 +113,10 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
           .doc(user.uid)
           .collection('upload_history')
           .orderBy('timestamp', descending: true)
-          .limit(20)
+          .limit(_historyLimit)
           .get();
+
+      if (!mounted) return;
 
       setState(() {
         history = querySnapshot.docs
@@ -89,6 +126,7 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
       });
     } catch (e) {
       debugPrint('❌ History Loading Error: $e');
+      if (!mounted) return;
       setState(() => _isLoadingHistory = false);
     }
   }
@@ -108,6 +146,8 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
           .limit(1)
           .get();
 
+      if (!mounted) return;
+
       if (existingDoc.docs.isNotEmpty) {
         final docId = existingDoc.docs.first.id;
 
@@ -118,6 +158,8 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
             .doc(docId)
             .update({'timestamp': FieldValue.serverTimestamp()});
 
+        if (!mounted) return;
+
         setState(() {
           final oldIndex = history.indexWhere((m) => m['id'] == movieId);
           if (oldIndex != -1) {
@@ -125,16 +167,6 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
             history.insert(0, {...movie, 'docId': docId});
           }
         });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${movieInfo['title']} moved to top of history'),
-              duration: const Duration(seconds: 2),
-              backgroundColor: const Color(0xFF6A0DAD),
-            ),
-          );
-        }
 
         debugPrint('✅ Film zaten history\'de, timestamp güncellendi');
         return;
@@ -146,10 +178,12 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
           .collection('upload_history')
           .add({...movieInfo, 'timestamp': FieldValue.serverTimestamp()});
 
+      if (!mounted) return;
+
       setState(() {
         history.insert(0, {...movieInfo, 'docId': docRef.id});
-        if (history.length > 20) {
-          history = history.sublist(0, 20);
+        if (history.length > _historyLimit) {
+          history = history.sublist(0, _historyLimit);
         }
       });
 
@@ -163,6 +197,8 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
     final user = _auth.currentUser;
     if (user == null) return;
 
+    if (index < 0 || index >= history.length) return;
+
     final movie = history[index];
     final docId = movie['docId'];
     if (docId == null) return;
@@ -175,42 +211,35 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
           .doc(docId)
           .delete();
 
-      setState(() {
-        history.removeAt(index);
-      });
+      if (!mounted) return;
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${movie['title']} deleted from history'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: const Color(0xFF6A0DAD),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
-      }
+      setState(() => history.removeAt(index));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${movie['title']} deleted from history'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF6A0DAD),
+        ),
+      );
     } catch (e) {
       debugPrint('❌ History silme hatası: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not delete. Please try again.'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete. Please try again.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _showDeleteConfirmation(int index) async {
     final movie = history[index];
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -243,29 +272,80 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
     }
   }
 
-  // ---------- GEMINI UPLOAD / ANALYZE ----------
+  // ----------------------------
+  // GEMINI: UPLOAD / ANALYZE
+  // ----------------------------
 
-  Future<String?> _uploadVideoToGemini(
-    Uint8List videoBytes,
-    String fileName,
-    String mimeType,
-  ) async {
+  String _inferMimeType(String fileNameLower) {
+    if (fileNameLower.endsWith('.mov')) return 'video/quicktime';
+    if (fileNameLower.endsWith('.avi')) return 'video/x-msvideo';
+    if (fileNameLower.endsWith('.mkv')) return 'video/x-matroska';
+    if (fileNameLower.endsWith('.webm')) return 'video/webm';
+    return 'video/mp4';
+  }
+
+  Future<int?> _getVideoSizeBytes(XFile video) async {
+    try {
+      if (kIsWeb) {
+        final bytes = await video.readAsBytes();
+        return bytes.length;
+      } else {
+        // XFile.length() exists on most platforms; safer than reading bytes.
+        return await video.length();
+      }
+    } catch (_) {
+      // fallback for some edge devices
+      try {
+        if (!kIsWeb && video.path.isNotEmpty) {
+          return File(video.path).lengthSync();
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<String?> _uploadVideoToGemini({
+    required XFile video,
+    required String mimeType,
+  }) async {
     final uploadUrl = Uri.parse(
       'https://generativelanguage.googleapis.com/upload/v1beta/files?key=$apiKey',
     );
+
     try {
-      var request = http.MultipartRequest('POST', uploadUrl);
+      final request = http.MultipartRequest('POST', uploadUrl);
+
       final parts = mimeType.split('/');
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          videoBytes,
-          filename: fileName,
-          contentType: MediaType(parts[0], parts[1]),
-        ),
-      );
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+      final mediaType = MediaType(parts.first, parts.length > 1 ? parts[1] : '');
+
+      if (kIsWeb) {
+        // Web: must read bytes
+        final Uint8List bytes = await video.readAsBytes();
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: video.name,
+            contentType: mediaType,
+          ),
+        );
+      } else {
+        // Mobile/Desktop: stream from file path (no huge RAM spike)
+        if (video.path.isEmpty) return null;
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            video.path,
+            filename: video.name,
+            contentType: mediaType,
+          ),
+        );
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse)
+          .timeout(const Duration(seconds: 60));
+
       if (response.statusCode == 200) {
         final uploadResult = jsonDecode(response.body);
         final fileInfo = uploadResult['file'];
@@ -274,6 +354,9 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
         debugPrint('❌ Upload error (${response.statusCode}): ${response.body}');
         return null;
       }
+    } on TimeoutException {
+      debugPrint('❌ Upload timeout');
+      return null;
     } catch (e) {
       debugPrint('❌ Upload exception: $e');
       return null;
@@ -284,41 +367,69 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
     final checkUrl = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel?key=$apiKey',
     );
+
     for (int i = 0; i < 20; i++) {
       try {
-        final response = await http.get(checkUrl);
+        final response =
+            await http.get(checkUrl).timeout(const Duration(seconds: 20));
+
         if (response.statusCode == 200) {
           final fileInfo = jsonDecode(response.body);
           final state = fileInfo['state'] as String?;
           if (state == 'ACTIVE') return true;
           if (state == 'FAILED') return false;
         }
+
         await Future.delayed(const Duration(seconds: 2));
-      } catch (_) {}
+      } catch (_) {
+        // ignore transient network errors, keep polling
+      }
     }
     return false;
   }
 
   Future<void> _deleteFileFromGemini(String? fileNameForModel) async {
     if (fileNameForModel == null) return;
+
     final deleteUrl = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel?key=$apiKey',
     );
     try {
-      await http.delete(deleteUrl);
+      await http.delete(deleteUrl).timeout(const Duration(seconds: 15));
     } catch (_) {}
+  }
+
+  String? _normalizeAiLine(String raw) {
+    final line = raw.trim();
+    if (line.isEmpty) return null;
+
+    // If AI returns multiple lines, take the first meaningful one
+    final firstLine = line.split('\n').map((e) => e.trim()).firstWhere(
+          (e) => e.isNotEmpty,
+          orElse: () => '',
+        );
+
+    if (firstLine.isEmpty) return null;
+
+    // remove wrapping quotes
+    final cleaned = firstLine.replaceAll('"', '').replaceAll("“", '').replaceAll("”", '');
+    return cleaned.trim();
   }
 
   Future<void> _pickVideo() async {
     if (isPicking || _isAnalyzing) return;
+
     setState(() => isPicking = true);
 
-    final XFile? file =
-        await picker.pickVideo(source: ImageSource.gallery).catchError((_) {
-      return null;
-    });
+    XFile? file;
+    try {
+      file = await picker.pickVideo(source: ImageSource.gallery);
+    } catch (_) {
+      file = null;
+    }
 
     if (!mounted) return;
+
     if (file == null) {
       setState(() {
         isPicking = false;
@@ -328,14 +439,18 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
     }
 
     setState(() {
-      status = "Video selected: ${file.name}";
+      status = "Video selected: ${file!.name}";
       isPicking = false;
       movieData = null;
     });
 
-    await _analyzeVideoWithGemini(file);
-  }Future<void> _analyzeVideoWithGemini(XFile video) async {
+    final int localRunId = ++_runId;
+    await _analyzeVideoWithGemini(file, runId: localRunId);
+  }
+
+  Future<void> _analyzeVideoWithGemini(XFile video, {required int runId}) async {
     if (apiKey.isEmpty) {
+      if (!mounted) return;
       setState(() {
         status =
             'Gemini API key is missing. Please set GEMINI_API_KEY in your .env file.';
@@ -344,35 +459,43 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
     }
 
     String? fileNameForModel;
+
     try {
+      if (!mounted || runId != _runId) return;
       setState(() {
         _isAnalyzing = true;
-        status = 'Uploading video...';
+        status = 'Preparing...';
       });
 
-      final videoBytes = await video.readAsBytes();
-      final sizeMB = videoBytes.length / 1024 / 1024;
-      if (sizeMB > 100) {
+      // size check without loading bytes into RAM (mobile)
+      final sizeBytes = await _getVideoSizeBytes(video);
+      if (!mounted || runId != _runId) return;
+
+      if (sizeBytes == null) {
         setState(() {
-          status =
-              'Video is too large! (${sizeMB.toStringAsFixed(1)} MB > 100 MB)';
+          status = 'Could not read video size. Please try another file.';
           _isAnalyzing = false;
         });
         return;
       }
 
-      String mimeType = 'video/mp4';
-      final fileName = video.name.toLowerCase();
-      if (fileName.endsWith('.mov')) mimeType = 'video/quicktime';
-      if (fileName.endsWith('.avi')) mimeType = 'video/x-msvideo';
-      if (fileName.endsWith('.mkv')) mimeType = 'video/x-matroska';
-      if (fileName.endsWith('.webm')) mimeType = 'video/webm';
+      final sizeMB = sizeBytes / 1024 / 1024;
+      if (sizeMB > _maxVideoMB) {
+        setState(() {
+          status =
+              'Video is too large! (${sizeMB.toStringAsFixed(1)} MB > $_maxVideoMB MB)';
+          _isAnalyzing = false;
+        });
+        return;
+      }
 
-      fileNameForModel = await _uploadVideoToGemini(
-        videoBytes,
-        video.name,
-        mimeType,
-      );
+      final mimeType = _inferMimeType(video.name.toLowerCase());
+
+      setState(() => status = 'Uploading video...');
+
+      fileNameForModel = await _uploadVideoToGemini(video: video, mimeType: mimeType);
+
+      if (!mounted || runId != _runId) return;
 
       if (fileNameForModel == null) {
         setState(() {
@@ -382,11 +505,14 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
         return;
       }
 
-      setState(() {
-        status = 'Video is being processed...';
-      });
+      setState(() => status = 'Video is being processed...');
 
       final isReady = await _waitForFileProcessing(fileNameForModel);
+
+      if (!mounted || runId != _runId) {
+        await _deleteFileFromGemini(fileNameForModel);
+        return;
+      }
 
       if (!isReady) {
         setState(() {
@@ -397,60 +523,50 @@ class _UploadPageState extends State<UploadPage> with SingleTickerProviderStateM
         return;
       }
 
-      setState(() {
-        status = 'Analyzing video with AI...';
-      });
+      setState(() => status = 'Analyzing video with AI...');
 
       const modelName = 'gemini-2.5-flash';
       final analyzeUrl = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
       );
 
-      String? resultText;
-
-      final response = await http.post(
-        analyzeUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
+      final response = await http
+          .post(
+            analyzeUrl,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
                 {
-                  'text': '''Identify this movie or TV series.
-Respond in this exact format:
-Title|Year|Type
-
-Where:
-- Title: The original English title
-- Year: Release year (4 digits, approximate if unsure)
-- Type: Either "movie" or "tv"
-
-Examples:
-"Inception|2010|movie"
-"Breaking Bad|2008|tv"
-"The Matrix|1999|movie"
-
-Return only that single line.''',
-                },
-                {
-                  'fileData': {
-                    'mimeType': mimeType,
-                    'fileUri':
-                        'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel',
-                  },
+                  'parts': [
+                    {'text': _prompt},
+                    {
+                      'fileData': {
+                        'mimeType': mimeType,
+                        'fileUri':
+                            'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel',
+                      },
+                    },
+                  ],
                 },
               ],
-            },
-          ],
-        }),
-      );
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
 
+      if (!mounted || runId != _runId) {
+        await _deleteFileFromGemini(fileNameForModel);
+        return;
+      }
+
+      String? resultText;
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['candidates'] != null &&
-            jsonResponse['candidates'].isNotEmpty) {
-          resultText =
-              jsonResponse['candidates'][0]['content']['parts'][0]['text'];
+        final candidates = jsonResponse['candidates'];
+        if (candidates != null && candidates is List && candidates.isNotEmpty) {
+          final parts = candidates[0]?['content']?['parts'];
+          if (parts != null && parts is List && parts.isNotEmpty) {
+            resultText = parts[0]?['text']?.toString();
+          }
         }
       } else {
         debugPrint('❌ Error from Gemini: ${response.body}');
@@ -462,52 +578,60 @@ Return only that single line.''',
 
       await _deleteFileFromGemini(fileNameForModel);
 
-      if (resultText != null) {
-        final parts = resultText.trim().split('|');
-        if (parts.length >= 3) {
-          final title = parts[0].trim();
-          final year = parts[1].trim();
-          final type = parts[2].trim().toLowerCase();
+      if (!mounted || runId != _runId) return;
 
-          setState(() {
-            status = 'Searching in TMDB database...';
-          });
-
-          final movieInfo = await _searchInTMDB(title, year, type);
-
-          if (movieInfo != null) {
-            setState(() {
-              movieData = movieInfo;
-              status = 'Successfully identified!';
-            });
-            await _saveToUserHistory(movieInfo);
-          } else {
-            setState(() {
-              status = 'Could not find in TMDB: $title ($year)';
-            });
-          }
-        } else {
-          setState(() {
-            status = 'Invalid response format from AI.';
-          });
-        }
-      } else {
-        if (!_isAnalyzing) return;
+      final normalized = resultText == null ? null : _normalizeAiLine(resultText);
+      if (normalized == null) {
         setState(() {
           status =
               'AI could not analyze the video. Please try again or check your API usage.';
         });
+        return;
       }
+
+      final parts = normalized.split('|').map((e) => e.trim()).toList();
+      if (parts.length < 3) {
+        setState(() => status = 'Invalid response format from AI.');
+        return;
+      }
+
+      final title = parts[0];
+      final year = parts[1];
+      final type = parts[2].toLowerCase();
+
+      if (title.isEmpty || (type != 'movie' && type != 'tv')) {
+        setState(() => status = 'Invalid response format from AI.');
+        return;
+      }
+
+      setState(() => status = 'Searching in TMDB database...');
+
+      final movieInfo = await _searchInTMDB(title, year, type);
+
+      if (!mounted || runId != _runId) return;
+
+      if (movieInfo != null) {
+        setState(() {
+          movieData = movieInfo;
+          status = 'Successfully identified!';
+        });
+        await _saveToUserHistory(movieInfo);
+      } else {
+        setState(() => status = 'Could not find in TMDB: $title ($year)');
+      }
+    } on TimeoutException catch (_) {
+      debugPrint('❌ Timeout in analyze');
+      if (fileNameForModel != null) await _deleteFileFromGemini(fileNameForModel);
+      if (!mounted || runId != _runId) return;
+      setState(() => status = 'Request timed out. Please try again.');
     } catch (e) {
-      await _deleteFileFromGemini(fileNameForModel);
       debugPrint('❌ Exception in analyze: $e');
-      setState(() {
-        status = 'Error: $e';
-      });
+      if (fileNameForModel != null) await _deleteFileFromGemini(fileNameForModel);
+      if (!mounted || runId != _runId) return;
+      setState(() => status = 'Error: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isAnalyzing = false);
-      }
+      if (!mounted || runId != _runId) return;
+      setState(() => _isAnalyzing = false);
     }
   }
 
@@ -516,78 +640,92 @@ Return only that single line.''',
     String year,
     String type,
   ) async {
+    if (tmdbApiKey.isEmpty) return null;
+
     final searchUrl = Uri.parse(
       'https://api.themoviedb.org/3/search/$type?api_key=$tmdbApiKey&query=${Uri.encodeComponent(title)}',
     );
 
     try {
-      final response = await http.get(searchUrl);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final results = data['results'] as List;
+      final response =
+          await http.get(searchUrl).timeout(const Duration(seconds: 20));
 
-        if (results.isEmpty) return null;
+      if (response.statusCode != 200) return null;
 
-        Map<String, dynamic>? bestMatch;
-        double bestScore = 0;
+      final data = jsonDecode(response.body);
+      final results = (data['results'] as List?) ?? const [];
+      if (results.isEmpty) return null;
 
-        for (var result in results) {
-          double score = 100.0;
+      Map<String, dynamic>? bestMatch;
+      double bestScore = -99999;
 
-          final resultTitle =
-              type == 'movie' ? (result['title'] ?? '') : (result['name'] ?? '');
-          final resultYear = type == 'movie'
-              ? (result['release_date'] ?? '').split('-').first
-              : (result['first_air_date'] ?? '').split('-').first;
+      for (final r in results) {
+        if (r is! Map) continue;
+        final result = Map<String, dynamic>.from(r);
 
-          if (resultTitle.toLowerCase() != title.toLowerCase()) {
-            score -= 20;
-          }
+        double score = 100.0;
 
-          if (resultYear.isNotEmpty && year.isNotEmpty) {
-            final yearDiff =
-                (int.tryParse(resultYear) ?? 0) - (int.tryParse(year) ?? 0);
-            if (yearDiff.abs() > 2) {
-              score -= 30;
-            } else if (yearDiff.abs() == 0) {
-              score += 50;
-            }
-          }
+        final resultTitle = type == 'movie'
+            ? (result['title'] ?? '').toString()
+            : (result['name'] ?? '').toString();
 
-          final popularity = (result['popularity'] ?? 0).toDouble();
-          score += popularity / 10;
+        final resultYear = type == 'movie'
+            ? (result['release_date'] ?? '').toString().split('-').first
+            : (result['first_air_date'] ?? '').toString().split('-').first;
 
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = result;
-          }
+        if (resultTitle.toLowerCase() != title.toLowerCase()) score -= 20;
+
+        final y1 = int.tryParse(resultYear);
+        final y2 = int.tryParse(year);
+        if (y1 != null && y2 != null) {
+          final diff = (y1 - y2).abs();
+          if (diff > 2) score -= 30;
+          if (diff == 0) score += 50;
         }
 
-        if (bestMatch != null) {
-          return {
-            'id': bestMatch['id'],
-            'title': type == 'movie' ? bestMatch['title'] : bestMatch['name'],
-            'overview': bestMatch['overview'],
-            'poster': bestMatch['poster_path'] != null
-                ? 'https://image.tmdb.org/t/p/w500${bestMatch['poster_path']}'
-                : null,
-            'rating': (bestMatch['vote_average'] is num)
-                ? (bestMatch['vote_average'] as num).toStringAsFixed(1)
-                : 'N/A',
-            'year': type == 'movie'
-                ? (bestMatch['release_date'] ?? '').split('-').first
-                : (bestMatch['first_air_date'] ?? '').split('-').first,
-            'type': type,
-          };
+        final popularity = (result['popularity'] is num)
+            ? (result['popularity'] as num).toDouble()
+            : 0.0;
+        score += popularity / 10;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = result;
         }
       }
+
+      if (bestMatch == null) return null;
+
+      final posterPath = bestMatch['poster_path']?.toString();
+      final poster = (posterPath != null && posterPath.isNotEmpty)
+          ? 'https://image.tmdb.org/t/p/w500$posterPath'
+          : null;
+
+      final voteAverage = bestMatch['vote_average'];
+      final rating = (voteAverage is num) ? voteAverage.toStringAsFixed(1) : 'N/A';
+
+      final finalYear = type == 'movie'
+          ? (bestMatch['release_date'] ?? '').toString().split('-').first
+          : (bestMatch['first_air_date'] ?? '').toString().split('-').first;
+
+      return {
+        'id': bestMatch['id'],
+        'title': type == 'movie' ? bestMatch['title'] : bestMatch['name'],
+        'overview': bestMatch['overview'],
+        'poster': poster,
+        'rating': rating,
+        'year': finalYear,
+        'type': type,
+      };
     } catch (e) {
       debugPrint('❌ TMDB Search Error: $e');
+      return null;
     }
-    return null;
-  }// ---------- BUILD ----------
+  }
 
- // ---------- BUILD ----------
+  // ----------------------------
+  // UI
+  // ----------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -598,13 +736,12 @@ Return only that single line.''',
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
       body: Column(
         children: [
-          // Instagram-style header with CineHolmes title (matching HomePage)
+          // Header
           Container(
             color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
             padding: EdgeInsets.only(top: paddingTop),
             child: Column(
               children: [
-                // CineHolmes title (same as HomePage)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: ShaderMask(
@@ -625,8 +762,6 @@ Return only that single line.''',
                     ),
                   ),
                 ),
-                
-                // Section title
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Text(
@@ -638,8 +773,6 @@ Return only that single line.''',
                     ),
                   ),
                 ),
-                
-                // Divider
                 Divider(
                   height: 1,
                   thickness: 0.5,
@@ -651,7 +784,6 @@ Return only that single line.''',
             ),
           ),
 
-          // Main content
           Expanded(
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -659,16 +791,15 @@ Return only that single line.''',
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   children: [
-                    // Main Upload Button with Shazam-style design
+                    // Upload state
                     if (!_isAnalyzing && movieData == null) ...[
                       const SizedBox(height: 40),
-                      
-                      // Animated button
+
                       AnimatedBuilder(
                         animation: _pulseAnimation,
                         builder: (context, child) {
                           return Transform.scale(
-                            scale: _isAnalyzing ? 1.0 : _pulseAnimation.value,
+                            scale: _pulseAnimation.value,
                             child: child,
                           );
                         },
@@ -686,7 +817,8 @@ Return only that single line.''',
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF6A0DAD).withOpacity(0.4),
+                                  color:
+                                      const Color(0xFF6A0DAD).withOpacity(0.4),
                                   blurRadius: 40,
                                   spreadRadius: 5,
                                 ),
@@ -700,10 +832,8 @@ Return only that single line.''',
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 32),
-                      
-                      // Instructions
                       Text(
                         'Tap to identify',
                         style: TextStyle(
@@ -723,7 +853,7 @@ Return only that single line.''',
                       ),
                     ],
 
-                    // Analyzing state
+                    // Analyzing
                     if (_isAnalyzing) ...[
                       const SizedBox(height: 60),
                       Container(
@@ -769,11 +899,9 @@ Return only that single line.''',
                       ),
                     ],
 
-                    // Result card
+                    // Result
                     if (movieData != null) ...[
                       const SizedBox(height: 20),
-                      
-                      // Success animation indicator
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
@@ -795,7 +923,8 @@ Return only that single line.''',
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(Icons.check_circle, color: Colors.white, size: 20),
+                            Icon(Icons.check_circle,
+                                color: Colors.white, size: 20),
                             SizedBox(width: 8),
                             Text(
                               'Match Found!',
@@ -808,17 +937,16 @@ Return only that single line.''',
                           ],
                         ),
                       ),
-                      
                       const SizedBox(height: 24),
-                      
-                      // Movie/Show card
+
                       Container(
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                              color:
+                                  Colors.black.withOpacity(isDark ? 0.3 : 0.1),
                               blurRadius: 20,
                               offset: const Offset(0, 4),
                             ),
@@ -826,7 +954,6 @@ Return only that single line.''',
                         ),
                         child: Column(
                           children: [
-                            // Poster with favorite button
                             Stack(
                               children: [
                                 ClipRRect(
@@ -835,7 +962,9 @@ Return only that single line.''',
                                   ),
                                   child: AspectRatio(
                                     aspectRatio: 2 / 3,
-                                    child: movieData!['poster'] != null && movieData!['poster'].isNotEmpty
+                                    child: (movieData!['poster'] ?? '')
+                                            .toString()
+                                            .isNotEmpty
                                         ? Image.network(
                                             movieData!['poster'],
                                             fit: BoxFit.cover,
@@ -859,8 +988,8 @@ Return only that single line.''',
                                           ),
                                   ),
                                 ),
-                                
-                                // Close button (sol üst)
+
+                                // Close
                                 Positioned(
                                   top: 12,
                                   left: 12,
@@ -885,22 +1014,21 @@ Return only that single line.''',
                                     ),
                                   ),
                                 ),
-                                
-                                // Favorite button (sağ üst)
+
+                                // Favorite
                                 Positioned(
                                   top: 12,
                                   right: 12,
                                   child: Consumer<LibraryProvider>(
                                     builder: (context, libraryProvider, _) {
-                                      final isFav = libraryProvider.isInLibrary(
-                                        movieData!['id'],
-                                      );
+                                      final id = movieData!['id'];
+                                      final isFav =
+                                          libraryProvider.isInLibrary(id);
+
                                       return GestureDetector(
                                         onTap: () {
                                           if (isFav) {
-                                            libraryProvider.removeFromLibrary(
-                                              movieData!['id'],
-                                            );
+                                            libraryProvider.removeFromLibrary(id);
                                           } else {
                                             libraryProvider.addToLibrary({
                                               'id': movieData!['id'],
@@ -916,7 +1044,8 @@ Return only that single line.''',
                                           padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: Colors.black.withOpacity(0.6),
+                                            color:
+                                                Colors.black.withOpacity(0.6),
                                             boxShadow: [
                                               BoxShadow(
                                                 color: isFav
@@ -929,7 +1058,9 @@ Return only that single line.''',
                                             ],
                                           ),
                                           child: Icon(
-                                            isFav ? Icons.favorite : Icons.favorite_border,
+                                            isFav
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
                                             color: isFav
                                                 ? const Color(0xFFEC5FFF)
                                                 : Colors.white,
@@ -942,18 +1073,19 @@ Return only that single line.''',
                                 ),
                               ],
                             ),
-                            
-                            // Info section
+
                             Padding(
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 children: [
                                   Text(
-                                    movieData!['title'] ?? 'Unknown Title',
+                                    (movieData!['title'] ?? 'Unknown Title')
+                                        .toString(),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 22,
-                                      color: isDark ? Colors.white : Colors.black87,
+                                      color:
+                                          isDark ? Colors.white : Colors.black87,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -961,16 +1093,15 @@ Return only that single line.''',
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(
-                                        Icons.star,
-                                        color: Color(0xFFFFD700),
-                                        size: 18,
-                                      ),
+                                      const Icon(Icons.star,
+                                          color: Color(0xFFFFD700), size: 18),
                                       const SizedBox(width: 4),
                                       Text(
                                         "${movieData!['rating']}",
                                         style: TextStyle(
-                                          color: isDark ? Colors.white : Colors.black87,
+                                          color: isDark
+                                              ? Colors.white
+                                              : Colors.black87,
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -981,14 +1112,18 @@ Return only that single line.''',
                                         height: 4,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: isDark ? Colors.white60 : Colors.black54,
+                                          color: isDark
+                                              ? Colors.white60
+                                              : Colors.black54,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Text(
                                         "${movieData!['year']}",
                                         style: TextStyle(
-                                          color: isDark ? Colors.white70 : Colors.black54,
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.black54,
                                           fontSize: 15,
                                         ),
                                       ),
@@ -996,23 +1131,27 @@ Return only that single line.''',
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    movieData!['overview'] ?? "No overview available.",
+                                    (movieData!['overview'] ??
+                                            "No overview available.")
+                                        .toString(),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 14,
                                       height: 1.5,
-                                      color: isDark ? Colors.white70 : Colors.black54,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : Colors.black54,
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  
-                                  // Action buttons
+
                                   Row(
                                     children: [
                                       Expanded(
                                         child: OutlinedButton(
                                           style: OutlinedButton.styleFrom(
-                                            foregroundColor: const Color(0xFF6A0DAD),
+                                            foregroundColor:
+                                                const Color(0xFF6A0DAD),
                                             side: const BorderSide(
                                               color: Color(0xFF6A0DAD),
                                               width: 2,
@@ -1021,7 +1160,8 @@ Return only that single line.''',
                                               vertical: 14,
                                             ),
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
                                           ),
                                           onPressed: () {
@@ -1049,7 +1189,8 @@ Return only that single line.''',
                                                 Color(0xFF9D4EDD),
                                               ],
                                             ),
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                           ),
                                           child: ElevatedButton(
                                             style: ElevatedButton.styleFrom(
@@ -1059,7 +1200,8 @@ Return only that single line.''',
                                                 vertical: 14,
                                               ),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                             ),
                                             onPressed: () {
@@ -1069,7 +1211,8 @@ Return only that single line.''',
                                                   builder: (_) => InfoPage(
                                                     id: movieData!['id'],
                                                     title: movieData!['title'],
-                                                    type: movieData!['type'] ?? 'movie',
+                                                    type: movieData!['type'] ??
+                                                        'movie',
                                                   ),
                                                 ),
                                               );
@@ -1093,14 +1236,14 @@ Return only that single line.''',
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(height: 32),
                     ],
 
-                    // History section
+                    // History
                     if (!_isAnalyzing && movieData == null) ...[
                       const SizedBox(height: 40),
-                      
+
                       if (_isLoadingHistory)
                         const Center(
                           child: Padding(
@@ -1113,7 +1256,7 @@ Return only that single line.''',
                             ),
                           ),
                         ),
-                        
+
                       if (!_isLoadingHistory && history.isNotEmpty) ...[
                         Row(
                           children: [
@@ -1131,14 +1274,13 @@ Return only that single line.''',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white60 : Colors.black54,
+                                color:
+                                    isDark ? Colors.white60 : Colors.black54,
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        
-                        // Grid view of history
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -1152,7 +1294,7 @@ Return only that single line.''',
                           ),
                           itemBuilder: (context, index) {
                             final movie = history[index];
-                            final poster = movie['poster'] as String? ?? '';
+                            final poster = (movie['poster'] ?? '').toString();
 
                             return GestureDetector(
                               onTap: () {
@@ -1177,7 +1319,8 @@ Return only that single line.''',
                                         ? Image.network(
                                             poster,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => Container(
+                                            errorBuilder: (_, __, ___) =>
+                                                Container(
                                               color: Colors.grey.shade800,
                                               child: const Icon(
                                                 Icons.broken_image,
@@ -1194,8 +1337,6 @@ Return only that single line.''',
                                               size: 32,
                                             ),
                                           ),
-                                    
-                                    // Gradient overlay
                                     Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
@@ -1215,7 +1356,7 @@ Return only that single line.''',
                           },
                         ),
                       ],
-                      
+
                       if (!_isLoadingHistory && history.isEmpty) ...[
                         const SizedBox(height: 20),
                         Center(
@@ -1224,14 +1365,18 @@ Return only that single line.''',
                               Icon(
                                 Icons.history,
                                 size: 48,
-                                color: isDark ? Colors.white24 : Colors.black26,
+                                color: isDark
+                                    ? Colors.white24
+                                    : Colors.black26,
                               ),
                               const SizedBox(height: 12),
                               Text(
                                 'No recent matches',
                                 style: TextStyle(
                                   fontSize: 15,
-                                  color: isDark ? Colors.white60 : Colors.black54,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : Colors.black54,
                                 ),
                               ),
                             ],
@@ -1239,7 +1384,7 @@ Return only that single line.''',
                         ),
                       ],
                     ],
-                    
+
                     const SizedBox(height: 40),
                   ],
                 ),
