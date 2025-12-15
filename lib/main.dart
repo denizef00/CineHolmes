@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'CineHolmes',
-      home: const AuthWrapper(),
+      home: UploadPage(), //const AuthWrapper(),
     );
   }
 }
@@ -49,9 +49,7 @@ class AuthWrapper extends StatelessWidget {
           return const Scaffold(
             backgroundColor: Colors.black,
             body: Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF6A0DAD),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF6A0DAD)),
             ),
           );
         }
