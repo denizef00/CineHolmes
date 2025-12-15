@@ -153,6 +153,112 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
     );
   }
 
+  void _showChangeUsernameDialog() {
+    // Giriş kontrolü
+    if (_currentUser == null) {
+      _showSignInPrompt();
+      return;
+    }
+
+    String newUsername = username;
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        title: const Text(
+          "Change Username",
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                initialValue: username,
+                style: const TextStyle(color: Colors.white),
+                onChanged: (value) => newUsername = value,
+                decoration: const InputDecoration(
+                  labelText: "Username",
+                  labelStyle: TextStyle(color: Colors.white70),
+                  hintText: "Enter new username",
+                  hintStyle: TextStyle(color: Colors.white38),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF6A0DAD)),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Username cannot be empty';
+                  }
+                  if (value.length < 3) {
+                    return 'Username must be at least 3 characters';
+                  }
+                  if (value.length > 20) {
+                    return 'Username must be less than 20 characters';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel",style: TextStyle(color: Colors.white),),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6A0DAD),
+            ),
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                try {
+                  await _currentUser?.updateDisplayName(newUsername);
+                  await _loadUserData();
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Username updated! ✅',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Color(0xFF6A0DAD),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '❌ Error: $e',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.red,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text("Save",style: TextStyle(color: Colors.white),),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showChangePasswordDialog() {
     // Giriş kontrolü
     if (_currentUser == null) {
@@ -295,7 +401,7 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: const Text("Cancel",style: TextStyle(color: Colors.white),),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -388,7 +494,7 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
                   }
                 }
               },
-              child: const Text("Change"),
+              child: const Text("Change",style: TextStyle(color: Colors.white),),
             ),
           ],
         ),
@@ -425,7 +531,7 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+                MaterialPageRoute(builder: (_) => const LoginPage(showBackButton: true)),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -569,7 +675,7 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
                       Navigator.pop(context); // Drawer'ı kapat
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                        MaterialPageRoute(builder: (_) => const LoginPage(showBackButton: true)),
                       );
                     },
                     child: const Text(
@@ -678,6 +784,19 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
               child: ListView(
                 padding: const EdgeInsets.all(8),
                 children: [
+                  // Change Username
+                  ListTile(
+                    leading: const Icon(
+                      Icons.person_outline,
+                      color: Colors.white70,
+                    ),
+                    title: const Text(
+                      'Change Username',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: _showChangeUsernameDialog,
+                  ),
+
                   // Change Password
                   if (isEmailPasswordUser)
                     ListTile(
