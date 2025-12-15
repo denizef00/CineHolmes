@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:cineholmes/screens/login_page.dart';
+import 'package:cineholmes/pages/upload_page.dart';
 import 'package:cineholmes/home_main.dart';
-import 'package:cineholmes/pages/library_provider.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -15,11 +15,9 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        ChangeNotifierProvider(create: (context) => LibraryProvider()),
-      ],
+    // ✅ Sadece ThemeProvider kullanıyoruz
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
       child: const MyApp(),
     ),
   );
@@ -33,7 +31,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'CineHolmes',
-      home: const AuthWrapper(), // ✅ AuthWrapper burada
+      home: const AuthWrapper(),
     );
   }
 }
@@ -49,37 +47,36 @@ class AuthWrapper extends StatelessWidget {
         // 1. Bağlantı durumunu kontrol et
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            backgroundColor: Colors.black,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF6A0DAD),
+              ),
+            ),
           );
         }
 
-        // 2. Hata kontrolü (opsiyonel)
+        // 2. Hata kontrolü
         if (snapshot.hasError) {
           return Scaffold(
-            body: Center(child: Text('Error: ${snapshot.error}')),
+            backgroundColor: Colors.black,
+            body: Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
           );
         }
 
         // 3. Kullanıcı durumunu kontrol et
         if (snapshot.hasData && snapshot.data != null) {
-          // ✅ Kullanıcı giriş yapmış - Kütüphaneyi yükle
+          // ✅ Kullanıcı giriş yapmış - Ana sayfaya git
           print('✅ User logged in: ${snapshot.data!.email}');
-
-          // Kütüphaneyi yükle
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Provider.of<LibraryProvider>(context, listen: false).loadLibrary();
-          });
-
-          return const CineHolmesApp();
+          return const UploadPage();
         } else {
-          // ❌ Kullanıcı giriş yapmamış - Kütüphaneyi temizle
+          // ❌ Kullanıcı giriş yapmamış - Login sayfasına git
           print('❌ No user logged in');
-
-          // Kütüphaneyi temizle
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Provider.of<LibraryProvider>(context, listen: false).clearLibrary();
-          });
-
           return const LoginPage();
         }
       },

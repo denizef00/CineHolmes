@@ -1,8 +1,8 @@
 import 'package:cineholmes/screens/forget_page.dart';
 import 'package:cineholmes/screens/signup_page.dart';
+import 'package:cineholmes/pages/upload_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../home_main.dart';
 import '../services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,9 +37,11 @@ class _LoginPageState extends State<LoginPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool("rememberMe", _rememberMe);
 
+      if (!mounted) return;
+      
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const CineHolmesApp()),
+        MaterialPageRoute(builder: (context) => const UploadPage()),
       );
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -57,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
       if (userCredential != null && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const CineHolmesApp()),
+          MaterialPageRoute(builder: (context) => const UploadPage()),
         );
       }
     } catch (e) {
@@ -84,6 +86,8 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
       );
 
+      if (!mounted) return;
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -100,6 +104,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Something went wrong")),
       );
@@ -124,13 +129,11 @@ class _LoginPageState extends State<LoginPage> {
         ),
         child: Center(
           child: Container(
-            padding: const EdgeInsets.all(20), // 🔧 daha küçük padding
-            margin: const EdgeInsets.symmetric(
-              horizontal: 40,
-            ), // 🔧 kutu daraldı
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.symmetric(horizontal: 40),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16), // 🔧 daha küçük radius
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white24),
             ),
             child: Column(
@@ -140,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                   "Login",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 24, // 🔧 biraz küçültüldü
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -192,8 +195,7 @@ class _LoginPageState extends State<LoginPage> {
                       "Remember Me",
                       style: TextStyle(color: Colors.white70, fontSize: 13),
                     ),
-
-                    SizedBox(width: 0),
+                    const SizedBox(width: 0),
                     TextButton(
                       onPressed: () {
                         Navigator.push(
@@ -261,7 +263,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 24),
 
-                // 🔥 Google Sign-In butonu
+                // Google Sign-In button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
