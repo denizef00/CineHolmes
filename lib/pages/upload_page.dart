@@ -1,23 +1,18 @@
-// upload_page.dart - Main upload page
+// upload_page.dart - Main upload page with camera detection (Updated)
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io' show File;
-import 'dart:typed_data';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/tmdb_service.dart';
+import '../services/gemini_service.dart';
 import 'info_page.dart';
 import 'history_drawer.dart';
 import 'profile_drawer.dart';
+import 'live_camera_detection_page.dart'; // 🆕 ADDED
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -30,6 +25,7 @@ class _UploadPageState extends State<UploadPage>
     with SingleTickerProviderStateMixin {
   final picker = ImagePicker();
   late final TMDBService tmdbService;
+  late final GeminiService geminiService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -51,6 +47,10 @@ class _UploadPageState extends State<UploadPage>
   void initState() {
     super.initState();
     tmdbService = TMDBService();
+    geminiService = GeminiService(
+      apiKey: apiKey,
+      tmdbApiKey: tmdbApiKey,
+    );
     _loadUserHistory();
 
     // Initialize pulse animation
@@ -246,433 +246,315 @@ class _UploadPageState extends State<UploadPage>
     );
 
     if (confirmed == true) {
-      _deleteFromHistory(index);
+      await _deleteFromHistory(index);
     }
   }
 
-  // ---------- GEMINI UPLOAD / ANALYZE ----------
-
-  Future<String?> _uploadVideoToGemini(
-    Uint8List videoBytes,
-    String fileName,
-    String mimeType,
-  ) async {
-    final uploadUrl = Uri.parse(
-      'https://generativelanguage.googleapis.com/upload/v1beta/files?key=$apiKey',
-    );
-    try {
-      var request = http.MultipartRequest('POST', uploadUrl);
-      final parts = mimeType.split('/');
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          videoBytes,
-          filename: fileName,
-          contentType: MediaType(parts[0], parts[1]),
-        ),
-      );
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
-      if (response.statusCode == 200) {
-        final uploadResult = jsonDecode(response.body);
-        final fileInfo = uploadResult['file'];
-        return fileInfo?['name'] as String?;
-      } else {
-        debugPrint('❌ Upload error (${response.statusCode}): ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      debugPrint('❌ Upload exception: $e');
-      return null;
-    }
-  }
-
-  Future<bool> _waitForFileProcessing(String fileNameForModel) async {
-    final checkUrl = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel?key=$apiKey',
-    );
-    for (int i = 0; i < 20; i++) {
-      try {
-        final response = await http.get(checkUrl);
-        if (response.statusCode == 200) {
-          final fileInfo = jsonDecode(response.body);
-          final state = fileInfo['state'] as String?;
-          if (state == 'ACTIVE') return true;
-          if (state == 'FAILED') return false;
-        }
-        await Future.delayed(const Duration(seconds: 2));
-      } catch (_) {}
-    }
-    return false;
-  }
-
-  Future<void> _deleteFileFromGemini(String? fileNameForModel) async {
-    if (fileNameForModel == null) return;
-    final deleteUrl = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel?key=$apiKey',
-    );
-    try {
-      await http.delete(deleteUrl);
-    } catch (_) {}
-  }
+  // ---------- VIDEO UPLOAD & ANALYSIS ----------
 
   Future<void> _pickVideo() async {
     if (isPicking || _isAnalyzing) return;
-    setState(() => isPicking = true);
-
-    final XFile? file = await picker
-        .pickVideo(source: ImageSource.gallery)
-        .catchError((_) {
-          return null;
-        });
-
-    if (!mounted) return;
-    if (file == null) {
-      setState(() {
-        isPicking = false;
-        status = "No video selected.";
-      });
-      return;
-    }
 
     setState(() {
-      status = "Video selected: ${file.name}";
-      isPicking = false;
+      isPicking = true;
+      status = "Selecting video...";
       movieData = null;
     });
 
-    await _analyzeVideoWithGemini(file);
-  }
-
-  Future<void> _analyzeVideoWithGemini(XFile video) async {
-    if (apiKey.isEmpty) {
-      setState(() {
-        status =
-            'Gemini API key is missing. Please set GEMINI_API_KEY in your .env file.';
-      });
-      return;
-    }
-
-    String? fileNameForModel;
     try {
-      setState(() {
-        _isAnalyzing = true;
-        status = 'Uploading video...';
-      });
+      final XFile? pickedFile = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 20), // 🆕 20 saniye limit
+      );
 
-      final videoBytes = await video.readAsBytes();
-      final sizeMB = videoBytes.length / 1024 / 1024;
-      if (sizeMB > 100) {
+      if (pickedFile == null) {
         setState(() {
-          status =
-              'Video is too large! (${sizeMB.toStringAsFixed(1)} MB > 100 MB)';
-          _isAnalyzing = false;
+          status = "No video selected.";
+          isPicking = false;
         });
         return;
       }
 
-      String mimeType = 'video/mp4';
-      final fileName = video.name.toLowerCase();
-      if (fileName.endsWith('.mov')) mimeType = 'video/quicktime';
-      if (fileName.endsWith('.avi')) mimeType = 'video/x-msvideo';
-      if (fileName.endsWith('.mkv')) mimeType = 'video/x-matroska';
-      if (fileName.endsWith('.webm')) mimeType = 'video/webm';
+      setState(() {
+        status = "Uploading to Gemini...";
+        _isAnalyzing = true;
+      });
 
-      fileNameForModel = await _uploadVideoToGemini(
+      final videoBytes = await pickedFile.readAsBytes();
+      final mimeType = geminiService.getMimeType(pickedFile.name);
+
+      final fileNameForModel = await geminiService.uploadVideoToGemini(
         videoBytes,
-        video.name,
+        pickedFile.name,
         mimeType,
       );
 
       if (fileNameForModel == null) {
-        setState(() {
-          status = 'Video could not be uploaded. Please try again.';
-          _isAnalyzing = false;
-        });
+        if (mounted) {
+          setState(() {
+            status = "❌ Upload failed. Please try again.";
+            _isAnalyzing = false;
+            isPicking = false;
+          });
+        }
         return;
       }
 
-      setState(() {
-        status = 'Video is being processed...';
-      });
+      setState(() => status = "Processing video...");
 
-      final isReady = await _waitForFileProcessing(fileNameForModel);
-
+      final isReady = await geminiService.waitForFileProcessing(fileNameForModel);
       if (!isReady) {
-        setState(() {
-          status = 'Video could not be processed. Please try again.';
-          _isAnalyzing = false;
-        });
-        await _deleteFileFromGemini(fileNameForModel);
+        await geminiService.deleteFileFromGemini(fileNameForModel);
+        if (mounted) {
+          setState(() {
+            status = "❌ Processing failed. Please try again.";
+            _isAnalyzing = false;
+            isPicking = false;
+          });
+        }
         return;
       }
 
-      setState(() {
-        status = 'Analyzing video with AI...';
-      });
+      setState(() => status = "Analyzing with AI...");
 
-      const modelName = 'gemini-2.5-flash';
-      final analyzeUrl = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
-      );
+      final result = await geminiService.analyzeVideo(fileNameForModel, mimeType);
+      await geminiService.deleteFileFromGemini(fileNameForModel);
 
-      String? resultText;
-
-      final response = await http.post(
-        analyzeUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {
-                  'text': '''Identify this movie or TV series.
-Respond in this exact format:
-Title|Year|Type
-
-Where:
-- Title: The original English title
-- Year: Release year (4 digits, approximate if unsure)
-- Type: Either "movie" or "tv"
-
-Examples:
-"Inception|2010|movie"
-"Breaking Bad|2008|tv"
-"The Matrix|1999|movie"
-
-Return only that single line.''',
-                },
-                {
-                  'fileData': {
-                    'mimeType': mimeType,
-                    'fileUri':
-                        'https://generativelanguage.googleapis.com/v1beta/$fileNameForModel',
-                  },
-                },
-              ],
-            },
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['candidates'] != null &&
-            jsonResponse['candidates'].isNotEmpty) {
-          resultText =
-              jsonResponse['candidates'][0]['content']['parts'][0]['text'];
+      if (result == null) {
+        if (mounted) {
+          setState(() {
+            status = "❌ Could not identify movie. Try again.";
+            _isAnalyzing = false;
+            isPicking = false;
+          });
         }
-      } else {
-        debugPrint('❌ Error from Gemini: ${response.body}');
-        setState(() {
-          status =
-              'AI request failed (${response.statusCode}). Check console logs.';
-        });
+        return;
       }
 
-      await _deleteFileFromGemini(fileNameForModel);
+      setState(() => status = "Searching in database...");
 
-      if (resultText != null) {
-        final parts = resultText.trim().split('|');
-        if (parts.length >= 3) {
-          final title = parts[0].trim();
-          final year = parts[1].trim();
-          final type = parts[2].trim().toLowerCase();
+      final tmdbResult = await geminiService.searchInTMDB(
+        result['title']!,
+        result['year']!,
+        result['type']!,
+      );
 
+      if (tmdbResult != null) {
+        await _saveToUserHistory(tmdbResult);
+        if (mounted) {
           setState(() {
-            status = 'Searching in TMDB database...';
-          });
-
-          final movieInfo = await _searchInTMDB(title, year, type);
-
-          if (movieInfo != null) {
-            setState(() {
-              movieData = movieInfo;
-              status = 'Successfully identified!';
-            });
-            await _saveToUserHistory(movieInfo);
-          } else {
-            setState(() {
-              status = 'Could not find in TMDB: $title ($year)';
-            });
-          }
-        } else {
-          setState(() {
-            status = 'Invalid response format from AI.';
+            movieData = tmdbResult;
+            status = "✅ Movie identified!";
+            _isAnalyzing = false;
+            isPicking = false;
           });
         }
       } else {
-        if (!_isAnalyzing) return;
-        setState(() {
-          status =
-              'AI could not analyze the video. Please try again or check your API usage.';
-        });
+        if (mounted) {
+          setState(() {
+            status = "❌ Movie not found in database.";
+            _isAnalyzing = false;
+            isPicking = false;
+          });
+        }
       }
     } catch (e) {
-      await _deleteFileFromGemini(fileNameForModel);
-      debugPrint('❌ Exception in analyze: $e');
-      setState(() {
-        status = 'Error: $e';
-      });
-    } finally {
+      debugPrint('❌ Video processing error: $e');
       if (mounted) {
-        setState(() => _isAnalyzing = false);
+        setState(() {
+          status = "❌ Error: ${e.toString()}";
+          _isAnalyzing = false;
+          isPicking = false;
+        });
       }
     }
   }
 
-  Future<Map<String, dynamic>?> _searchInTMDB(
-    String title,
-    String year,
-    String type,
-  ) async {
-    final searchUrl = Uri.parse(
-      'https://api.themoviedb.org/3/search/$type?api_key=$tmdbApiKey&query=${Uri.encodeComponent(title)}',
+  // 🆕 SHOW DETECTION METHOD SELECTION
+  void _showDetectionMethodDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Choose Detection Method',
+          style: TextStyle(color: Colors.white, fontSize: 20),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Gallery Option
+            InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo();
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6A0DAD).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF6A0DAD),
+                    width: 2,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6A0DAD),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.video_library,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Gallery',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Select from videos',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Live Camera Option
+            InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                _openLiveCameraDetection();
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6A0DAD).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF6A0DAD),
+                    width: 2,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6A0DAD),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Live Camera',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Point at screen',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-
-    try {
-      final response = await http.get(searchUrl);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final results = data['results'] as List;
-
-        if (results.isEmpty) return null;
-
-        Map<String, dynamic>? bestMatch;
-        double bestScore = 0;
-
-        for (var result in results) {
-          double score = 100.0;
-
-          final resultTitle = type == 'movie'
-              ? (result['title'] ?? '')
-              : (result['name'] ?? '');
-          final resultYear = type == 'movie'
-              ? (result['release_date'] ?? '').split('-').first
-              : (result['first_air_date'] ?? '').split('-').first;
-
-          if (resultTitle.toLowerCase() != title.toLowerCase()) {
-            score -= 20;
-          }
-
-          if (resultYear.isNotEmpty && year.isNotEmpty) {
-            final yearDiff =
-                (int.tryParse(resultYear) ?? 0) - (int.tryParse(year) ?? 0);
-            if (yearDiff.abs() > 2) {
-              score -= 30;
-            } else if (yearDiff.abs() == 0) {
-              score += 50;
-            }
-          }
-
-          final popularity = (result['popularity'] ?? 0).toDouble();
-          score += popularity / 10;
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = result;
-          }
-        }
-
-        if (bestMatch != null) {
-          return {
-            'id': bestMatch['id'],
-            'title': type == 'movie' ? bestMatch['title'] : bestMatch['name'],
-            'overview': bestMatch['overview'],
-            'poster': bestMatch['poster_path'] != null
-                ? 'https://image.tmdb.org/t/p/w500${bestMatch['poster_path']}'
-                : null,
-            'rating': (bestMatch['vote_average'] is num)
-                ? (bestMatch['vote_average'] as num).toStringAsFixed(1)
-                : 'N/A',
-            'year': type == 'movie'
-                ? (bestMatch['release_date'] ?? '').split('-').first
-                : (bestMatch['first_air_date'] ?? '').split('-').first,
-            'type': type,
-          };
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ TMDB Search Error: $e');
-    }
-    return null;
   }
 
-  // ----------------------------
-  // UI BUILDERS
-  // ----------------------------
+  // 🆕 OPEN LIVE CAMERA DETECTION
+  void _openLiveCameraDetection() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const LiveCameraDetectionPage(),
+      ),
+    ).then((_) {
+      // Refresh history when returning from camera detection
+      _loadUserHistory();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      endDrawer: const ProfileDrawer(),
-      drawer: const HistoryDrawer(),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            _buildTopBar(),
-
-            // Main Content Area
-            Expanded(child: _buildMainContent()),
-          ],
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.history, color: Colors.white),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5),
+        title: const Text(
+          'CineHolmes',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // History Icon (Left)
+        centerTitle: true,
+        actions: [
           Builder(
             builder: (context) => IconButton(
-              icon: const Icon(Icons.history, color: Colors.white, size: 28),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            ),
-          ),
-
-          // Logo
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ).createShader(bounds),
-            child: const Text(
-              'CineHolmes',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w400,
-                fontFamily: 'Pacifico',
-                color: Colors.white,
-              ),
-            ),
-          ),
-
-          // Profile Icon (Right)
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.person, color: Colors.white, size: 28),
-              onPressed: () {
-                Scaffold.of(context).openEndDrawer();
-              },
+              icon: const Icon(Icons.person, color: Colors.white),
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
             ),
           ),
         ],
       ),
+      drawer: const HistoryDrawer(),
+      endDrawer: const ProfileDrawer(),
+      body: _buildMainContent(),
     );
   }
 
@@ -696,12 +578,12 @@ Return only that single line.''',
 
           const SizedBox(height: 60),
 
-          // Camera Button (Shazam style)
+          // 🆕 UPDATED: Main button now shows selection dialog
           if (!_isAnalyzing && movieData == null) ...[
             ScaleTransition(
               scale: _pulseAnimation,
               child: GestureDetector(
-                onTap: _pickVideo,
+                onTap: _showDetectionMethodDialog, // 🆕 Changed to dialog
                 child: Container(
                   width: 180,
                   height: 180,
@@ -721,14 +603,14 @@ Return only that single line.''',
                     ],
                   ),
                   child: const Icon(
-                    Icons.videocam,
+                    Icons.videocam, // ✅ Original icon
                     size: 80,
                     color: Colors.white,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             const Text(
               'Tap to identify a movie',
               style: TextStyle(fontSize: 16, color: Colors.white60),
