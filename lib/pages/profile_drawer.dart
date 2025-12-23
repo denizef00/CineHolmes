@@ -2,10 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../screens/login_page.dart';
-import '../home_main.dart';
 
 class ProfileDrawer extends StatefulWidget {
   const ProfileDrawer({super.key});
@@ -810,28 +808,6 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
                       ),
                       onTap: _showChangePasswordDialog,
                     ),
-
-                  // Dark Theme Toggle
-                  ListTile(
-                    leading: const Icon(
-                      Icons.dark_mode_outlined,
-                      color: Colors.white70,
-                    ),
-                    title: const Text(
-                      'Dark Theme',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    trailing: Switch(
-                      value: Provider.of<ThemeProvider>(context).isDark,
-                      onChanged: (_) {
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).toggleTheme();
-                      },
-                      activeColor: const Color(0xFF6A0DAD),
-                    ),
-                  ),
                 ],
               ),
             ),
