@@ -3,9 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+
 import 'package:cineholmes/screens/login_page.dart';
 import 'package:cineholmes/pages/upload_page.dart';
 import 'package:cineholmes/home_main.dart';
+
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -15,7 +17,6 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(
-    // ✅ Sadece ThemeProvider kullanıyoruz
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
       child: const MyApp(),
@@ -28,10 +29,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'CineHolmes',
-      home: UploadPage(), //const AuthWrapper(),
+      home: AuthWrapper(),
     );
   }
 }
@@ -44,7 +45,7 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // 1. Bağlantı durumunu kontrol et
+        // 1) Loading
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Colors.black,
@@ -54,7 +55,7 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 2. Hata kontrolü
+        // 2) Error
         if (snapshot.hasError) {
           return Scaffold(
             backgroundColor: Colors.black,
@@ -67,14 +68,12 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 3. Kullanıcı durumunu kontrol et
+        // 3) Auth state
         if (snapshot.hasData && snapshot.data != null) {
-          // ✅ Kullanıcı giriş yapmış - Ana sayfaya git
-          print('✅ User logged in: ${snapshot.data!.email}');
+          // ✅ logged in
           return const UploadPage();
         } else {
-          // ❌ Kullanıcı giriş yapmamış - Login sayfasına git
-          print('❌ No user logged in');
+          // ❌ not logged in
           return const LoginPage();
         }
       },

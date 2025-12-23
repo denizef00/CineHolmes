@@ -571,23 +571,15 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
       ),
     );
 
-    if (confirmed == true) {
-      await _authService.signOut();
-      if (!mounted) return;
+    if (confirmed != true) return;
 
-      // Sign out sonrası profil drawer'ı yenile
-      setState(() {
-        _currentUser = null;
-      });
+  await _authService.signOut();
+  if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Signed out successfully'),
-          backgroundColor: Color(0xFF6A0DAD),
-        ),
-      );
-    }
-  }
+  // Drawer açıksa kapat (en temiz UX)
+  Navigator.of(context).maybePop();
+}
+
 
   @override
   Widget build(BuildContext context) {
