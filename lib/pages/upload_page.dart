@@ -562,6 +562,7 @@ class _UploadPageState extends State<UploadPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center, // ✅ Ortala
         children: [
           const SizedBox(height: 40),
 
@@ -578,34 +579,36 @@ class _UploadPageState extends State<UploadPage>
 
           const SizedBox(height: 60),
 
-          // 🆕 UPDATED: Main button now shows selection dialog
+          // 🆕 UPDATED: Main button now shows selection dialog (CENTERED)
           if (!_isAnalyzing && movieData == null) ...[
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: GestureDetector(
-                onTap: _showDetectionMethodDialog, // 🆕 Changed to dialog
-                child: Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6A0DAD).withOpacity(0.5),
-                        blurRadius: 30,
-                        spreadRadius: 5,
+            Center( // ✅ Kesin ortala
+              child: ScaleTransition(
+                scale: _pulseAnimation,
+                child: GestureDetector(
+                  onTap: _showDetectionMethodDialog, // 🆕 Changed to dialog
+                  child: Container(
+                    width: 180,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6A0DAD), Color(0xFF9D4EDD)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.videocam, // ✅ Original icon
-                    size: 80,
-                    color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6A0DAD).withOpacity(0.5),
+                          blurRadius: 30,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.videocam, // ✅ Original icon
+                      size: 80,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

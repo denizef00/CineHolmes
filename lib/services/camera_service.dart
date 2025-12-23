@@ -75,39 +75,52 @@ class CameraService {
   // Capture a single frame from camera
   Future<Uint8List?> captureFrame() async {
     if (_controller == null || !_isInitialized || _isProcessing) {
+      debugPrint('❌ Cannot capture: controller=${_controller != null}, initialized=$_isInitialized, processing=$_isProcessing');
       return null;
     }
+
+    // ✅ Wait a bit to ensure camera is stable
+    await Future.delayed(const Duration(milliseconds: 100));
 
     try {
       _isProcessing = true;
 
       // Take picture
+      debugPrint('📸 Taking picture...');
       final XFile picture = await _controller!.takePicture();
+      debugPrint('✅ Picture taken, reading bytes...');
+      
       final bytes = await picture.readAsBytes();
+      debugPrint('✅ Bytes read: ${bytes.length}');
 
       // Compress and resize image for faster processing
+      debugPrint('🔄 Decoding image...');
       final image = img.decodeImage(bytes);
       if (image == null) {
+        debugPrint('❌ Failed to decode image');
         _isProcessing = false;
         return null;
       }
 
+      debugPrint('🔄 Resizing image...');
       // Resize to max 1280px width (maintains aspect ratio)
       final resized = img.copyResize(
         image,
         width: image.width > 1280 ? 1280 : image.width,
       );
 
+      debugPrint('🔄 Compressing to JPEG...');
       // Encode to JPEG with quality 85
       final compressed = Uint8List.fromList(
         img.encodeJpg(resized, quality: 85),
       );
 
       _isProcessing = false;
-      debugPrint('✅ Frame captured: ${compressed.length} bytes');
+      debugPrint('✅ Frame ready: ${compressed.length} bytes (original: ${bytes.length})');
       return compressed;
     } catch (e) {
       debugPrint('❌ Frame capture error: $e');
+      debugPrint('❌ Error type: ${e.runtimeType}');
       _isProcessing = false;
       return null;
     }

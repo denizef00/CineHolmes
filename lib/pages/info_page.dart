@@ -361,59 +361,17 @@ class _InfoPageState extends State<InfoPage> {
 
                       const SizedBox(height: 20),
 
-                      // BUTTONS
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed:
-                                  _trailer != null ? _openTrailer : null,
-                              icon: const Icon(Icons.play_arrow),
-                              label: const Text('Watch Trailer'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFD32F2F),
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FutureBuilder<bool>(
-                              future: _isInAnyList(),
-                              builder: (context, snapshot) {
-                                final isInList = snapshot.data ?? false;
-
-                                return ElevatedButton.icon(
-                                  onPressed: _showAddToListModal,
-                                  icon: Icon(
-                                    isInList
-                                        ? Icons.check
-                                        : Icons.add,
-                                  ),
-                                  label: Text(
-                                    isInList
-                                        ? 'In Lists'
-                                        : 'Add to List',
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isInList
-                                        ? const Color(0xFF2E7D32)
-                                        : Colors.grey.shade800,
-                                    foregroundColor: Colors.white,
-                                    padding:
-                                        const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                      // BUTTONS - Only Watch Trailer
+                      ElevatedButton.icon(
+                        onPressed: _trailer != null ? _openTrailer : null,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Watch Trailer'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD32F2F),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
 
                       const SizedBox(height: 24),

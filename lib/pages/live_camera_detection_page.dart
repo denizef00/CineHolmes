@@ -1,6 +1,7 @@
-// live_camera_detection_page.dart - Live camera detection screen
+// live_camera_detection_page.dart - Live camera detection with batch analysis
 
 import 'dart:async';
+import 'dart:typed_data'; // ✅ Added for Uint8List
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,7 +9,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/camera_service.dart';
-import '../services/frame_analyzer.dart';
 import '../services/gemini_service.dart';
 import '../services/tmdb_service.dart';
 import 'info_page.dart';
@@ -24,18 +24,19 @@ class LiveCameraDetectionPage extends StatefulWidget {
 class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
     with WidgetsBindingObserver {
   final CameraService _cameraService = CameraService();
-  late final FrameAnalyzer _frameAnalyzer;
-  late final TMDBService _tmdbService;
   late final GeminiService _geminiService;
+  late final TMDBService _tmdbService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _isInitialized = false;
-  bool _isDetecting = false;
-  bool _isProcessingFrame = false;
+  bool _isCapturing = false;
+  bool _isAnalyzing = false;
   String _statusMessage = 'Initializing camera...';
-  Timer? _captureTimer;
-  Map<String, dynamic>? _detectedMovie;
+  
+  List<Map<String, dynamic>> _suggestions = [];
+  int _capturedFrames = 0;
+  final int _totalFramesNeeded = 3;
 
   @override
   void initState() {
@@ -47,8 +48,6 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _captureTimer?.cancel();
-    _frameAnalyzer.stopAnalysis();
     _cameraService.dispose();
     super.dispose();
   }
@@ -59,7 +58,7 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      _stopDetection();
+      // Pause camera
     } else if (state == AppLifecycleState.resumed) {
       _cameraService.initializeCamera().then((_) {
         if (mounted) setState(() {});
@@ -69,16 +68,26 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
 
   Future<void> _initializeServices() async {
     try {
+      debugPrint('🔧 Initializing services...');
+      
       final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
       final tmdbApiKey = dotenv.env['TMDB_API_KEY'] ?? '';
+
+      debugPrint('🔑 API Keys status:');
+      debugPrint('   Gemini: ${apiKey.isEmpty ? "❌ EMPTY" : "✅ Loaded (${apiKey.length} chars)"}');
+      debugPrint('   TMDB: ${tmdbApiKey.isEmpty ? "❌ EMPTY" : "✅ Loaded (${tmdbApiKey.length} chars)"}');
+
+      if (apiKey.isEmpty) {
+        throw Exception('Gemini API key is empty! Check .env file');
+      }
 
       _geminiService = GeminiService(
         apiKey: apiKey,
         tmdbApiKey: tmdbApiKey,
       );
-      _frameAnalyzer = FrameAnalyzer(geminiService: _geminiService);
       _tmdbService = TMDBService();
 
+      debugPrint('📷 Initializing camera...');
       final success = await _cameraService.initializeCamera();
 
       if (!mounted) return;
@@ -86,9 +95,13 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
       setState(() {
         _isInitialized = success;
         _statusMessage = success
-            ? 'Point camera at screen and tap Start'
+            ? 'Point camera at screen and tap Scan'
             : 'Failed to initialize camera';
       });
+      
+      if (success) {
+        debugPrint('✅ All services initialized successfully');
+      }
     } catch (e) {
       debugPrint('❌ Service initialization error: $e');
       if (!mounted) return;
@@ -98,172 +111,176 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
     }
   }
 
-  void _startDetection() {
-    if (!_isInitialized || _isDetecting) return;
+  Future<void> _startScanning() async {
+    if (!_isInitialized || _isCapturing) return;
+
+    // ✅ Kamera kontrolü
+    if (_cameraService.controller == null || 
+        !_cameraService.controller!.value.isInitialized) {
+      _showErrorDialog('Camera not ready. Please try again.');
+      return;
+    }
 
     setState(() {
-      _isDetecting = true;
-      _statusMessage = 'Analyzing frames...';
-      _detectedMovie = null;
+      _isCapturing = true;
+      _capturedFrames = 0;
+      _suggestions = [];
+      _statusMessage = 'Capturing frames...';
     });
 
-    _frameAnalyzer.startAnalysis();
-
-    // 🆕 Capture frames every second (no interval check needed)
-    _captureTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      // Don't capture if already processing or reached max
-      if (_isProcessingFrame || _frameAnalyzer.totalFramesAnalyzed >= 7) {
-        return;
-      }
-
-      // Capture frame immediately
-      await _processFrame();
-
-      // Update UI
-      if (mounted && _isDetecting) {
-        setState(() {
-          _statusMessage = 'Analyzing frame ${_frameAnalyzer.totalFramesAnalyzed + 1}/7...';
-        });
-      }
-    });
-  }
-
-  Future<void> _processFrame() async {
-    if (!_isDetecting || _isProcessingFrame) return;
-
-    setState(() => _isProcessingFrame = true);
-
+    // 🎯 YENİ YÖNTEM: Önce 3 frame'i topla, sonra hepsini birden yolla
+    final List<Uint8List> capturedFrames = [];
+    
     try {
-      debugPrint('📸 Capturing frame ${_frameAnalyzer.totalFramesAnalyzed + 1}/5...');
+      // ADIM 1: 3 frame yakala (upload YOK henüz!)
+      debugPrint('📸 Step 1: Capturing 3 frames...');
       
-      // Capture frame from camera
-      final frameBytes = await _cameraService.captureFrame();
-      if (frameBytes == null) {
-        debugPrint('❌ Frame capture failed - frameBytes is null');
-        setState(() => _isProcessingFrame = false);
-        return;
-      }
+      for (int i = 0; i < _totalFramesNeeded; i++) {
+        setState(() {
+          _capturedFrames = i + 1;
+          _statusMessage = 'Capturing frame ${i + 1}/$_totalFramesNeeded...';
+        });
 
-      debugPrint('✅ Frame captured: ${frameBytes.length} bytes');
-
-      // Analyze frame with timeout
-      final result = await _frameAnalyzer.analyzeFrame(frameBytes).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          debugPrint('⏱️ Frame analysis timeout (30 seconds)');
-          return null;
-        },
-      );
-
-      if (result != null) {
-        debugPrint('🎯 Movie detected: ${result['title']}');
-        
-        // 🆕 Hemen UI'yı güncelle
-        if (mounted) {
-          setState(() {
-            _statusMessage = 'Movie found! Loading...';
-          });
+        // Kamera kontrolü
+        if (_cameraService.controller == null || 
+            !_cameraService.controller!.value.isInitialized) {
+          throw Exception('Camera disconnected');
         }
-        
-        // Confident detection achieved!
-        await _handleDetectionResult(result);
-        return; // 🆕 Hemen çık, daha fazla işlem yapma
-      } else {
-        debugPrint('ℹ️ No confident detection yet, continuing...');
-        
-        // Check if we've reached max frames without detection
-        if (_frameAnalyzer.totalFramesAnalyzed >= 7) { // 🆕 5 → 7
-          debugPrint('⚠️ Max frames reached (7), stopping detection');
-          _stopDetection();
-          
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'Could not detect movie. Try a different scene.';
-            });
-            
-            // Show error dialog
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) _showErrorDialog();
-            });
-          }
+
+        final frameBytes = await _cameraService.captureFrame();
+        if (frameBytes == null) {
+          debugPrint('❌ Frame ${i + 1} capture returned null');
+          throw Exception('Failed to capture frame ${i + 1}');
+        }
+
+        capturedFrames.add(frameBytes);
+        debugPrint('✅ Frame ${i + 1} captured: ${frameBytes.length} bytes');
+
+        // 1 saniye bekle (son frame hariç)
+        if (i < _totalFramesNeeded - 1) {
+          await Future.delayed(const Duration(seconds: 1));
         }
       }
+
+      debugPrint('✅ All 3 frames captured!');
+
+      // ADIM 2: Şimdi 3 frame'i birden upload et
+      setState(() {
+        _isCapturing = false;
+        _isAnalyzing = true;
+        _statusMessage = 'Uploading frames to AI...';
+      });
+
+      debugPrint('⬆️ Step 2: Uploading all frames together...');
+      final List<String> frameFiles = [];
+
+      for (int i = 0; i < capturedFrames.length; i++) {
+        debugPrint('⬆️ Uploading frame ${i + 1}/${capturedFrames.length}...');
+        
+        final fileName = 'frame_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+        final fileNameForModel = await _geminiService.uploadVideoToGemini(
+          capturedFrames[i],
+          fileName,
+          'image/jpeg',
+        );
+
+        if (fileNameForModel == null) {
+          debugPrint('❌ Frame ${i + 1} upload failed');
+          throw Exception('Failed to upload frame ${i + 1}');
+        }
+
+        // Wait for processing
+        debugPrint('⏳ Waiting for frame ${i + 1} processing...');
+        final isReady = await _geminiService.waitForFileProcessing(fileNameForModel);
+        if (!isReady) {
+          debugPrint('❌ Frame ${i + 1} processing timeout');
+          throw Exception('Frame ${i + 1} processing failed');
+        }
+
+        frameFiles.add(fileNameForModel);
+        debugPrint('✅ Frame ${i + 1} ready: $fileNameForModel');
+      }
+
+      debugPrint('✅ All frames uploaded and ready!');
+
+      // ADIM 3: Toplu analiz
+      await _analyzeFramesBatch(frameFiles);
+
     } catch (e) {
-      debugPrint('❌ Frame processing error: $e');
-    } finally {
+      debugPrint('❌ Frame capture/upload error: $e');
+      
       if (mounted) {
-        setState(() => _isProcessingFrame = false);
+        setState(() {
+          _isCapturing = false;
+          _isAnalyzing = false;
+          _statusMessage = 'Error occurred';
+        });
+        _showErrorDialog('Error: ${e.toString()}\n\nPlease try again.');
       }
     }
   }
 
-  Future<void> _handleDetectionResult(Map<String, dynamic> result) async {
-    _stopDetection();
-
+  Future<void> _analyzeFramesBatch(List<String> frameFiles) async {
     setState(() {
-      _statusMessage = 'Movie found!';
+      _isCapturing = false;
+      _isAnalyzing = true;
+      _statusMessage = 'Analyzing frames with AI...';
     });
 
     try {
-      // Search in TMDB
-      final movieData = await _geminiService.searchInTMDB(
-        result['title']?.toString() ?? '',
-        result['year']?.toString() ?? '',
-        result['type']?.toString() ?? 'movie',
-      );
+      // Call Gemini with all 3 frames and ask for 4 suggestions
+      final suggestions = await _geminiService.analyzeMultipleFramesForSuggestions(frameFiles);
 
-      if (movieData != null) {
-        // Save to history
-        await _saveToHistory(movieData);
-
-        if (!mounted) return;
-
-        // 🆕 Navigate directly to InfoPage (like gallery flow)
-        Navigator.pop(context); // Close camera page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => InfoPage(
-              id: movieData['id'],
-              title: movieData['title'],
-              type: movieData['type'] ?? 'movie',
-            ),
-          ),
-        );
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _statusMessage = 'Movie not found';
-        });
-        // Show error and allow retry
-        _showErrorDialog();
+      // Clean up uploaded files
+      for (final file in frameFiles) {
+        await _geminiService.deleteFileFromGemini(file);
       }
-    } catch (e) {
-      debugPrint('❌ Detection result handling error: $e');
+
+      if (suggestions == null || suggestions.isEmpty) {
+        throw Exception('No movies detected');
+      }
+
+      debugPrint('🎯 Received ${suggestions.length} suggestions from Gemini');
+
+      // Search each suggestion in TMDB and save to history
+      final List<Map<String, dynamic>> validSuggestions = [];
+      
+      for (final suggestion in suggestions.take(4)) {  // Max 4
+        final tmdbData = await _geminiService.searchInTMDB(
+          suggestion['title'] ?? '',
+          suggestion['year'] ?? '',
+          suggestion['type'] ?? 'movie',
+        );
+
+        if (tmdbData != null) {
+          validSuggestions.add(tmdbData);
+          // Save to history
+          await _saveToHistory(tmdbData);
+        }
+      }
+
       if (!mounted) return;
+
+      if (validSuggestions.isEmpty) {
+        throw Exception('Could not find movies in database');
+      }
+
       setState(() {
-        _statusMessage = 'Error occurred';
+        _suggestions = validSuggestions;
+        _isAnalyzing = false;
+        _statusMessage = 'Found ${validSuggestions.length} suggestions!';
       });
-      _showErrorDialog();
+
+    } catch (e) {
+      debugPrint('❌ Analysis error: $e');
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _statusMessage = 'Analysis failed';
+        });
+        _showErrorDialog('Could not identify movies. Try a different scene.');
+      }
     }
-  }
-
-  void _stopDetection() {
-    _captureTimer?.cancel();
-    _frameAnalyzer.stopAnalysis();
-    setState(() {
-      _isDetecting = false;
-      _isProcessingFrame = false;
-    });
-  }
-
-  void _resetDetection() {
-    _stopDetection();
-    _frameAnalyzer.reset();
-    setState(() {
-      _detectedMovie = null;
-      _statusMessage = 'Point camera at screen and tap Start';
-    });
   }
 
   Future<void> _saveToHistory(Map<String, dynamic> movieInfo) async {
@@ -271,17 +288,17 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
     if (user == null) return;
 
     try {
-      final movieId = movieInfo['id'];
-
+      // Check if already exists
       final existingDoc = await _firestore
           .collection('users')
           .doc(user.uid)
           .collection('upload_history')
-          .where('id', isEqualTo: movieId)
+          .where('id', isEqualTo: movieInfo['id'])
           .limit(1)
           .get();
 
       if (existingDoc.docs.isNotEmpty) {
+        // Update timestamp
         await _firestore
             .collection('users')
             .doc(user.uid)
@@ -289,20 +306,22 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
             .doc(existingDoc.docs.first.id)
             .update({'timestamp': FieldValue.serverTimestamp()});
       } else {
+        // Add new
         await _firestore
             .collection('users')
             .doc(user.uid)
             .collection('upload_history')
-            .add({...movieInfo, 'timestamp': FieldValue.serverTimestamp()});
+            .add({
+          ...movieInfo,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
       }
-
-      debugPrint('✅ Saved to history');
     } catch (e) {
-      debugPrint('❌ History save error: $e');
+      debugPrint('❌ Error saving to history: $e');
     }
   }
 
-  void _showErrorDialog() {
+  void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -312,12 +331,12 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
           children: [
             Icon(Icons.error_outline, color: Colors.orange, size: 28),
             SizedBox(width: 12),
-            Text('Could not detect movie', style: TextStyle(color: Colors.white)),
+            Text('Detection Failed', style: TextStyle(color: Colors.white)),
           ],
         ),
-        content: const Text(
-          'Please try again or use a different scene.',
-          style: TextStyle(color: Colors.white70),
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -333,7 +352,7 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
             ),
             onPressed: () {
               Navigator.pop(context); // Close dialog
-              _resetDetection(); // Try again
+              _startScanning(); // Try again
             },
             child: const Text('Try Again'),
           ),
@@ -354,11 +373,11 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Live Detection',
+          'Camera Detection',
           style: TextStyle(color: Colors.white),
         ),
         actions: [
-          if (_isInitialized && !_isDetecting)
+          if (_isInitialized && !_isCapturing && !_isAnalyzing)
             IconButton(
               icon: const Icon(Icons.flip_camera_ios, color: Colors.white),
               onPressed: () async {
@@ -366,265 +385,330 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
                 setState(() {});
               },
             ),
-          if (_isInitialized && _cameraService.hasFlash())
-            IconButton(
-              icon: Icon(
-                _cameraService.controller?.value.flashMode == FlashMode.torch
-                    ? Icons.flash_on
-                    : Icons.flash_off,
-                color: Colors.white,
-              ),
-              onPressed: () async {
-                await _cameraService.toggleFlash();
-                setState(() {});
-              },
-            ),
         ],
       ),
-      body: !_isInitialized
-          ? Center(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (!_isInitialized) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF6A0DAD)),
+            const SizedBox(height: 16),
+            Text(
+              _statusMessage,
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_suggestions.isNotEmpty) {
+      // Show grid of suggestions
+      return _buildSuggestionsGrid();
+    }
+
+    // Show camera preview
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Camera Preview
+        if (_cameraService.controller != null &&
+            _cameraService.controller!.value.isInitialized)
+          CameraPreview(_cameraService.controller!),
+
+        // Scanning overlay
+        if (_isCapturing || _isAnalyzing)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const CircularProgressIndicator(color: Color(0xFF6A0DAD)),
                   const SizedBox(height: 24),
+                  if (_isCapturing)
+                    Text(
+                      'Capturing frame $_capturedFrames/$_totalFramesNeeded',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (_isAnalyzing)
+                    const Text(
+                      'Analyzing with AI...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+        // Bottom controls
+        if (!_isCapturing && !_isAnalyzing)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.8),
+                  ],
+                ),
+              ),
+              child: Column(
+                children: [
                   Text(
                     _statusMessage,
-                    style: const TextStyle(color: Colors.white70),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A0DAD),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 48,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    onPressed: _startScanning,
+                    icon: const Icon(Icons.camera_alt, color: Colors.white),
+                    label: const Text(
+                      'Scan Movie',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            )
-          : Stack(
-              children: [
-                // Camera Preview
-                Positioned.fill(
-                  child: _cameraService.controller != null
-                      ? CameraPreview(_cameraService.controller!)
-                      : Container(color: Colors.black),
-                ),
+            ),
+          ),
+      ],
+    );
+  }
 
-                // Overlay with scanning guide
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _ScannerOverlayPainter(
-                      isDetecting: _isDetecting,
-                    ),
+  Widget _buildSuggestionsGrid() {
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.black,
+          child: Column(
+            children: [
+              const Text(
+                'Movie Suggestions',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Found ${_suggestions.length} matches',
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Grid
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.7,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _suggestions.length,
+            itemBuilder: (context, index) {
+              final movie = _suggestions[index];
+              return _buildMovieCard(movie);
+            },
+          ),
+        ),
+
+        // Scan Again Button
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.black,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6A0DAD),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              minimumSize: const Size(double.infinity, 48),
+            ),
+            onPressed: () {
+              setState(() {
+                _suggestions = [];
+                _statusMessage = 'Point camera at screen and tap Scan';
+              });
+            },
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            label: const Text(
+              'Scan Again',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMovieCard(Map<String, dynamic> movie) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => InfoPage(
+              id: movie['id'],
+              title: movie['title'],
+              type: movie['type'] ?? 'movie',
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Poster
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
                   ),
+                  color: Colors.grey.shade900,
                 ),
-
-                // Status and Controls
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.8),
-                        ],
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        // Status Message
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            _statusMessage,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  child: movie['poster'] != null &&
+                          movie['poster'].toString().isNotEmpty
+                      ? Image.network(
+                          movie['poster'],
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(
+                              Icons.movie,
+                              color: Colors.white24,
+                              size: 48,
                             ),
                           ),
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.movie,
+                            color: Colors.white24,
+                            size: 48,
+                          ),
                         ),
-                        const SizedBox(height: 24),
+                ),
+              ),
+            ),
 
-                        // Control Buttons
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (!_isDetecting && _detectedMovie == null) ...[
-                              // Start Button
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF6A0DAD),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 48,
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                onPressed: _startDetection,
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.play_arrow, color: Colors.white),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Start Detection',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            if (_isDetecting) ...[
-                              // Stop Button
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 48,
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                onPressed: _stopDetection,
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.stop, color: Colors.white),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Stop',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
+            // Info
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movie['title'] ?? 'Unknown',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (movie['year'] != null &&
+                          movie['year'].toString().isNotEmpty)
+                        Text(
+                          movie['year'].toString(),
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (movie['rating'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                movie['rating'].toString(),
+                                style: const TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
     );
-  }
-}
-
-// Custom painter for scanner overlay
-class _ScannerOverlayPainter extends CustomPainter {
-  final bool isDetecting;
-
-  _ScannerOverlayPainter({
-    required this.isDetecting,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    // Semi-transparent black overlay
-    final overlayPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
-      ..style = PaintingStyle.fill;
-
-    // Draw overlay
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), overlayPaint);
-
-    // Scanning frame
-    final frameRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2),
-      width: size.width * 0.8,
-      height: size.height * 0.5,
-    );
-
-    // Clear the center
-    canvas.drawRect(
-      frameRect,
-      Paint()
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear,
-    );
-
-    // Draw frame border
-    paint.color = isDetecting ? const Color(0xFF6A0DAD) : Colors.white;
-    canvas.drawRect(frameRect, paint);
-
-    // Draw corner indicators
-    final cornerLength = 30.0;
-    paint.strokeWidth = 4.0;
-
-    // Top-left
-    canvas.drawLine(
-      frameRect.topLeft,
-      frameRect.topLeft + Offset(cornerLength, 0),
-      paint,
-    );
-    canvas.drawLine(
-      frameRect.topLeft,
-      frameRect.topLeft + Offset(0, cornerLength),
-      paint,
-    );
-
-    // Top-right
-    canvas.drawLine(
-      frameRect.topRight,
-      frameRect.topRight + Offset(-cornerLength, 0),
-      paint,
-    );
-    canvas.drawLine(
-      frameRect.topRight,
-      frameRect.topRight + Offset(0, cornerLength),
-      paint,
-    );
-
-    // Bottom-left
-    canvas.drawLine(
-      frameRect.bottomLeft,
-      frameRect.bottomLeft + Offset(cornerLength, 0),
-      paint,
-    );
-    canvas.drawLine(
-      frameRect.bottomLeft,
-      frameRect.bottomLeft + Offset(0, -cornerLength),
-      paint,
-    );
-
-    // Bottom-right
-    canvas.drawLine(
-      frameRect.bottomRight,
-      frameRect.bottomRight + Offset(-cornerLength, 0),
-      paint,
-    );
-    canvas.drawLine(
-      frameRect.bottomRight,
-      frameRect.bottomRight + Offset(0, -cornerLength),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ScannerOverlayPainter oldDelegate) {
-    return isDetecting != oldDelegate.isDetecting;
   }
 }
