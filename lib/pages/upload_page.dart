@@ -47,10 +47,7 @@ class _UploadPageState extends State<UploadPage>
   void initState() {
     super.initState();
     tmdbService = TMDBService();
-    geminiService = GeminiService(
-      apiKey: apiKey,
-      tmdbApiKey: tmdbApiKey,
-    );
+    geminiService = GeminiService(apiKey: apiKey, tmdbApiKey: tmdbApiKey);
     _loadUserHistory();
 
     // Initialize pulse animation
@@ -302,7 +299,9 @@ class _UploadPageState extends State<UploadPage>
 
       setState(() => status = "Processing video...");
 
-      final isReady = await geminiService.waitForFileProcessing(fileNameForModel);
+      final isReady = await geminiService.waitForFileProcessing(
+        fileNameForModel,
+      );
       if (!isReady) {
         await geminiService.deleteFileFromGemini(fileNameForModel);
         if (mounted) {
@@ -317,7 +316,10 @@ class _UploadPageState extends State<UploadPage>
 
       setState(() => status = "Analyzing with AI...");
 
-      final result = await geminiService.analyzeVideo(fileNameForModel, mimeType);
+      final result = await geminiService.analyzeVideo(
+        fileNameForModel,
+        mimeType,
+      );
       await geminiService.deleteFileFromGemini(fileNameForModel);
 
       if (result == null) {
@@ -396,10 +398,7 @@ class _UploadPageState extends State<UploadPage>
                 decoration: BoxDecoration(
                   color: const Color(0xFF6A0DAD).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFF6A0DAD),
-                    width: 2,
-                  ),
+                  border: Border.all(color: const Color(0xFF6A0DAD), width: 2),
                 ),
                 child: Row(
                   children: [
@@ -455,10 +454,7 @@ class _UploadPageState extends State<UploadPage>
                 decoration: BoxDecoration(
                   color: const Color(0xFF6A0DAD).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFF6A0DAD),
-                    width: 2,
-                  ),
+                  border: Border.all(color: const Color(0xFF6A0DAD), width: 2),
                 ),
                 child: Row(
                   children: [
@@ -512,9 +508,7 @@ class _UploadPageState extends State<UploadPage>
   void _openLiveCameraDetection() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const LiveCameraDetectionPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const LiveCameraDetectionPage()),
     ).then((_) {
       // Refresh history when returning from camera detection
       _loadUserHistory();
@@ -562,30 +556,33 @@ class _UploadPageState extends State<UploadPage>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center, // ✅ Ortala
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 40),
 
           // Status Text
-          Text(
-            status,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: Colors.white70,
+          Center(
+            // ✅ Status'u da center'a al
+            child: Text(
+              status,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.white70,
+              ),
             ),
           ),
 
           const SizedBox(height: 60),
 
-          // 🆕 UPDATED: Main button now shows selection dialog (CENTERED)
+          // Main button - Always centered
           if (!_isAnalyzing && movieData == null) ...[
-            Center( // ✅ Kesin ortala
+            Center(
               child: ScaleTransition(
                 scale: _pulseAnimation,
                 child: GestureDetector(
-                  onTap: _showDetectionMethodDialog, // 🆕 Changed to dialog
+                  onTap: _showDetectionMethodDialog,
                   child: Container(
                     width: 180,
                     height: 180,
@@ -605,7 +602,7 @@ class _UploadPageState extends State<UploadPage>
                       ],
                     ),
                     child: const Icon(
-                      Icons.videocam, // ✅ Original icon
+                      Icons.videocam,
                       size: 80,
                       color: Colors.white,
                     ),
@@ -614,134 +611,173 @@ class _UploadPageState extends State<UploadPage>
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Tap to identify a movie',
-              style: TextStyle(fontSize: 16, color: Colors.white60),
+            const Center(
+              // ✅ Text'i de center'a al
+              child: Text(
+                'Tap to identify a movie',
+                style: TextStyle(fontSize: 16, color: Colors.white60),
+              ),
             ),
           ],
 
-          // Analyzing Indicator
+          // Analyzing Indicator - Always centered
           if (_isAnalyzing) ...[
-            const CircularProgressIndicator(
-              strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6A0DAD)),
+            const Center(
+              // ✅ Loading'i center'a al
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6A0DAD)),
+              ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Analyzing...',
-              style: TextStyle(fontSize: 16, color: Colors.white60),
+            const Center(
+              // ✅ Text'i center'a al
+              child: Text(
+                'Analyzing...',
+                style: TextStyle(fontSize: 16, color: Colors.white60),
+              ),
             ),
           ],
 
-          // Movie Result Card
+          // Movie Result Card - Always centered
           if (movieData != null) ...[
-            Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Poster
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child:
-                        movieData!['poster'] != null &&
-                            movieData!['poster'].toString().isNotEmpty
-                        ? Image.network(
-                            movieData!['poster'],
-                            height: 300,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+            Center(
+              // ✅ Movie card'ı center'a al
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Poster
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child:
+                          movieData!['poster'] != null &&
+                              movieData!['poster'].toString().isNotEmpty
+                          ? Image.network(
+                              movieData!['poster'],
+                              height: 300,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 300,
+                                color: Colors.grey.shade800,
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white54,
+                                  size: 64,
+                                ),
+                              ),
+                            )
+                          : Container(
                               height: 300,
                               color: Colors.grey.shade800,
                               child: const Icon(
-                                Icons.broken_image,
+                                Icons.movie,
                                 color: Colors.white54,
                                 size: 64,
                               ),
                             ),
-                          )
-                        : Container(
-                            height: 300,
-                            color: Colors.grey.shade800,
-                            child: const Icon(
-                              Icons.movie,
-                              color: Colors.white54,
-                              size: 64,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Title
-                  Text(
-                    movieData!['title'] ?? 'Unknown',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 20),
 
-                  // Year & Rating
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        movieData!['year']?.toString() ?? '',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white60,
-                        ),
+                    // Title
+                    Text(
+                      movieData!['title'] ?? 'Unknown',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      if (movieData!['rating'] != null) ...[
-                        const SizedBox(width: 12),
-                        const Icon(Icons.star, color: Colors.amber, size: 18),
-                        const SizedBox(width: 4),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Year & Rating
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                         Text(
-                          movieData!['rating'].toString(),
+                          movieData!['year']?.toString() ?? '',
                           style: const TextStyle(
                             fontSize: 16,
                             color: Colors.white60,
                           ),
                         ),
+                        if (movieData!['rating'] != null) ...[
+                          const SizedBox(width: 12),
+                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          const SizedBox(width: 4),
+                          Text(
+                            movieData!['rating'].toString(),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white60,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+                    ),
+                    const SizedBox(height: 20),
 
-                  // Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
+                    // Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6A0DAD),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => InfoPage(
+                                    id: movieData!['id'],
+                                    title: movieData!['title'],
+                                    type: movieData!['type'] ?? 'movie',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'View Details',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6A0DAD),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            backgroundColor: Colors.white.withOpacity(0.1),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 20,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => InfoPage(
-                                  id: movieData!['id'],
-                                  title: movieData!['title'],
-                                  type: movieData!['type'] ?? 'movie',
-                                ),
-                              ),
-                            );
+                            setState(() {
+                              movieData = null;
+                              status = "Ready to identify movies and TV shows";
+                            });
                           },
                           child: const Text(
-                            'View Details',
+                            'New Search',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -749,37 +785,10 @@ class _UploadPageState extends State<UploadPage>
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.1),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                            horizontal: 20,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            movieData = null;
-                            status = "Ready to identify movies and TV shows";
-                          });
-                        },
-                        child: const Text(
-                          'New Search',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
