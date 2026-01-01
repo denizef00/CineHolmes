@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -19,6 +20,27 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isLoading = false;
 
   Future<void> _signUp() async {
+    // Yeni: username trimlenmiş halini al
+    final username = _usernameController.text.trim();
+
+    // Kullanıcı adı kontrolü: boşluk + uzunluk
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Username is required ❌")));
+      return;
+    }
+
+    // Uzunluk kontrolü: 2 - 40 karakter arası olmalı
+    if (username.length < 2 || username.length > 40) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Username must be between 2 and 40 characters ❌"),
+        ),
+      );
+      return;
+    }
+
     // Şifre kontrolü
     if (_passwordController.text.trim() !=
         _confirmPasswordController.text.trim()) {
@@ -27,15 +49,6 @@ class _SignUpPageState extends State<SignUpPage> {
       ).showSnackBar(const SnackBar(content: Text("Passwords do not match ❌")));
       return;
     }
-
-    // Kullanıcı adı kontrolü
-    if (_usernameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Username is required ❌")));
-      return;
-    }
-
     setState(() => _isLoading = true);
     try {
       // 1. Firebase'de hesap oluştur
@@ -61,7 +74,6 @@ class _SignUpPageState extends State<SignUpPage> {
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Hata: ${e.message}';
 
-      // Türkçe hata mesajları
       if (e.code == 'email-already-in-use') {
         errorMessage = 'This email address already exists.';
       } else if (e.code == 'weak-password') {
