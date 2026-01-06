@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'CineHolmes',
-      home: AuthWrapper(),
+      home: UploadPage(),
     );
   }
 }

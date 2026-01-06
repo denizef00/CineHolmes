@@ -130,7 +130,7 @@ class _LiveCameraDetectionPageState extends State<LiveCameraDetectionPage>
 
     // 🎯 YENİ YÖNTEM: Önce 3 frame'i topla, sonra hepsini birden yolla
     final List<Uint8List> capturedFrames = [];
-    
+    await Future.delayed(const Duration(seconds: 1));
     try {
       // ADIM 1: 3 frame yakala (upload YOK henüz!)
       debugPrint('📸 Step 1: Capturing 3 frames...');
