@@ -1,15 +1,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- İzinler -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- 🆕 Gallery/Storage Permissions (Android 13+ uyumlu) -->
+    <!-- For Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    
+    <!-- For Android 12 and below -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"/>
+    
+    <!-- Camera & Internet Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="CineHolmes"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true">
         
         <activity
             android:name=".MainActivity"
@@ -27,7 +37,7 @@
               android:resource="@style/NormalTheme"
               />
             
-            <!-- Google Sign In Client ID (Senin Kodundan Alındı) -->
+            <!-- Google Sign In Client ID -->
             <meta-data
               android:name="com.google.android.gms.auth.api.signin.clientId"
               android:value="329648345045-l4ggeonelcjtq3jknbqiu4ttc59vmhbu.apps.googleusercontent.com" />
@@ -44,7 +54,7 @@
             android:value="2" />
     </application>
 
-    <!-- ✅ DÜZELTİLMİŞ QUERIES BÖLÜMÜ (Linklerin açılması için şart) -->
+    <!-- ✅ QUERIES BÖLÜMÜ (Linklerin açılması için şart) -->
     <queries>
         <!-- Metin işleme -->
         <intent>

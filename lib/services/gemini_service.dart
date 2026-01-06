@@ -1,4 +1,4 @@
-// gemini_service.dart - Gemini AI video analysis service
+// gemini_service.dart - Gemini AI video analysis service (Updated)
 
 import 'dart:convert';
 import 'dart:typed_data';
@@ -14,7 +14,6 @@ class GeminiService {
     required this.apiKey,
     required this.tmdbApiKey,
   }) {
-    // ✅ Validate API keys
     if (apiKey.isEmpty || apiKey.length < 30) {
       debugPrint('⚠️ WARNING: Gemini API key looks invalid (length: ${apiKey.length})');
       debugPrint('   Expected: 39+ characters');
@@ -45,7 +44,6 @@ class GeminiService {
       debugPrint('   File: $fileName');
       debugPrint('   Size: ${videoBytes.length} bytes');
       debugPrint('   MIME: $mimeType');
-      debugPrint('   URL: ${uploadUrl.toString().replaceAll(apiKey, "***")}');
       
       var request = http.MultipartRequest('POST', uploadUrl);
       final parts = mimeType.split('/');
@@ -74,7 +72,6 @@ class GeminiService {
         debugPrint('❌ Upload error (${response.statusCode})');
         debugPrint('   Response body: ${response.body}');
         
-        // Parse error for better message
         try {
           final errorData = jsonDecode(response.body);
           final errorMsg = errorData['error']?['message'] ?? 'Unknown error';
@@ -121,7 +118,193 @@ class GeminiService {
     } catch (_) {}
   }
 
-  // Analyze video with Gemini AI
+  // 🆕 ANALYZE VIDEO FOR 4 SUGGESTIONS (Gallery)
+  Future<List<Map<String, dynamic>>?> analyzeVideoForSuggestions(
+    String fileNameForModel,
+    String mimeType,
+  ) async {
+    const modelName = 'gemini-2.5-flash';
+    final analyzeUrl = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
+    );
+
+    try {
+      debugPrint('🎬 Analyzing video for 4 suggestions...');
+
+      // 🎯 OPTIMIZED PROMPT - Fast and accurate
+      final prompt = '''Analyze this video clip and identify the movie or TV show.
+
+IMPORTANT: Provide EXACTLY 4 possibilities ranked by confidence.
+
+OUTPUT FORMAT - Pure JSON array only (no markdown, no backticks):
+[
+  {"title":"Exact Title","year":"2020","type":"movie","confidence":"high"},
+  {"title":"Alternative 1","year":"2019","type":"tv","confidence":"medium"},
+  {"title":"Alternative 2","year":"2021","type":"movie","confidence":"medium"},
+  {"title":"Alternative 3","year":"2018","type":"tv","confidence":"low"}
+]
+
+RULES:
+- "type" must be exactly "movie" or "tv" (lowercase)
+- "confidence" must be "high", "medium", or "low"
+- Use original English titles (e.g., "The Dark Knight" not translated)
+- Year must be 4 digits
+- First result should be your best guess (high confidence)
+- Include alternatives that match visual style, genre, or actors if uncertain
+- If very confident, still provide 3 plausible alternatives
+
+FOCUS ON:
+- Visual scenes, characters, setting, cinematography
+- Acting style and facial features
+- Production quality (cinema vs TV)
+- Color grading and visual style
+- Time period (costume, technology, location)
+
+Return ONLY the JSON array.''';
+
+      final requestBody = {
+        "contents": [
+          {
+            "parts": [
+              {
+                "fileData": {
+                  "mimeType": mimeType,
+                  "fileUri": "https://generativelanguage.googleapis.com/v1beta/$fileNameForModel",
+                }
+              },
+              {"text": prompt}
+            ]
+          }
+        ],
+        "generationConfig": {
+          "temperature": 0.3, // Lower for more focused results
+          "topK": 40,
+          "topP": 0.95,
+          "maxOutputTokens": 2048,
+        }
+      };
+
+      final response = await http.post(
+        analyzeUrl,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode != 200) {
+        debugPrint('❌ Gemini API Error: ${response.statusCode}');
+        debugPrint('Response: ${response.body}');
+        return null;
+      }
+
+      final data = jsonDecode(response.body);
+      
+      if (data['candidates'] == null || data['candidates'].isEmpty) {
+        debugPrint('❌ No candidates in response');
+        return null;
+      }
+
+      final text = data['candidates'][0]['content']['parts'][0]['text'];
+      debugPrint('📝 Gemini response (${text.length} chars): $text');
+
+      // Clean and parse JSON
+      String cleanText = text.trim();
+      
+      // Remove markdown code blocks
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.substring(7);
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.substring(3);
+      }
+      
+      if (cleanText.endsWith('```')) {
+        cleanText = cleanText.substring(0, cleanText.length - 3);
+      }
+      
+      cleanText = cleanText.trim();
+
+      // Fix incomplete JSON
+      if (!cleanText.endsWith(']')) {
+        debugPrint('⚠️ JSON incomplete, attempting to fix...');
+        
+        int lastCompleteIndex = cleanText.lastIndexOf('},');
+        if (lastCompleteIndex > 0) {
+          cleanText = cleanText.substring(0, lastCompleteIndex + 1);
+          cleanText += '\n]';
+          debugPrint('🔧 Fixed JSON by closing array');
+        } else {
+          int lastOpenBrace = cleanText.lastIndexOf('{');
+          if (lastOpenBrace > 0) {
+            cleanText = cleanText.substring(0, lastOpenBrace);
+            if (cleanText.endsWith(',')) {
+              cleanText = cleanText.substring(0, cleanText.length - 1);
+            }
+            cleanText += '\n]';
+            debugPrint('🔧 Fixed JSON by removing incomplete object');
+          }
+        }
+      }
+
+      debugPrint('🔍 Attempting to parse JSON (${cleanText.length} chars)...');
+
+      List<dynamic> parsed;
+      try {
+        parsed = jsonDecode(cleanText);
+      } catch (e) {
+        debugPrint('❌ JSON parse failed: $e');
+        debugPrint('📄 Clean text: $cleanText');
+        
+        // Manual extraction
+        final objects = <Map<String, dynamic>>[];
+        final regex = RegExp(r'\{[^}]+\}', multiLine: true);
+        final matches = regex.allMatches(cleanText);
+        
+        for (final match in matches) {
+          try {
+            final obj = jsonDecode(match.group(0)!);
+            if (obj is Map && obj.containsKey('title')) {
+              objects.add(Map<String, dynamic>.from(obj));
+            }
+          } catch (_) {}
+        }
+        
+        if (objects.isEmpty) {
+          debugPrint('❌ Could not extract any valid objects');
+          return null;
+        }
+        
+        debugPrint('✅ Extracted ${objects.length} objects manually');
+        parsed = objects;
+      }
+      
+      final List<Map<String, dynamic>> suggestions = parsed.map((item) {
+        return {
+          'title': item['title']?.toString() ?? 'Unknown',
+          'year': item['year']?.toString() ?? '2020',
+          'type': item['type']?.toString().toLowerCase() ?? 'movie',
+          'confidence': item['confidence']?.toString() ?? 'medium',
+        };
+      }).toList();
+
+      if (suggestions.isEmpty) {
+        debugPrint('❌ No valid suggestions extracted');
+        return null;
+      }
+
+      debugPrint('✅ Parsed ${suggestions.length} suggestions');
+      for (int i = 0; i < suggestions.length; i++) {
+        debugPrint('  ${i + 1}. ${suggestions[i]['title']} (${suggestions[i]['year']}) - ${suggestions[i]['confidence']}');
+      }
+
+      return suggestions;
+
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error analyzing video: $e');
+      debugPrint('Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}');
+      return null;
+    }
+  }
+
+  // OLD SINGLE-RESULT METHOD (kept for compatibility if needed)
   Future<Map<String, String>?> analyzeVideo(
     String fileNameForModel,
     String mimeType,
@@ -146,13 +329,12 @@ Title|Year|Type
 
 Where:
 - Title: The original English title
-- Year: Release year (4 digits, approximate if unsure)
+- Year: Release year (4 digits)
 - Type: Either "movie" or "tv"
 
 Examples:
 "Inception|2010|movie"
 "Breaking Bad|2008|tv"
-"The Matrix|1999|movie"
 
 Return only that single line.''',
                 },
@@ -185,8 +367,6 @@ Return only that single line.''',
             };
           }
         }
-      } else {
-        debugPrint('❌ Error from Gemini: ${response.body}');
       }
     } catch (e) {
       debugPrint('❌ Analyze exception: $e');
@@ -282,7 +462,7 @@ Return only that single line.''',
     return 'video/mp4';
   }
 
-  /// Analyze multiple frames together and get 4 movie suggestions
+  /// Analyze multiple frames together and get 4 movie suggestions (Camera)
   Future<List<Map<String, dynamic>>?> analyzeMultipleFramesForSuggestions(
     List<String> frameFiles,
   ) async {
@@ -296,7 +476,6 @@ Return only that single line.''',
     try {
       debugPrint('🎬 Analyzing ${frameFiles.length} frames for suggestions...');
 
-      // Create file references
       final fileParts = frameFiles.map((file) {
         return {
           "fileData": {
@@ -306,22 +485,35 @@ Return only that single line.''',
         };
       }).toList();
 
-      // Enhanced prompt for 4 suggestions
+      // 🎯 SAME OPTIMIZED PROMPT
       final prompt = '''Analyze these ${frameFiles.length} frames from a screen and identify the movie or TV show.
 
-Provide EXACTLY 4 possibilities in pure JSON format.
+IMPORTANT: Provide EXACTLY 4 possibilities ranked by confidence.
 
-Requirements:
-- Pure JSON array only, no markdown, no text, no backticks
-- Exactly 4 objects
-- Each object: {"title":"Name","year":"2020","type":"movie","confidence":"high"}
-- type: must be "movie" or "tv"
-- confidence: must be "high", "medium", or "low"
+OUTPUT FORMAT - Pure JSON array only (no markdown, no backticks):
+[
+  {"title":"Exact Title","year":"2020","type":"movie","confidence":"high"},
+  {"title":"Alternative 1","year":"2019","type":"tv","confidence":"medium"},
+  {"title":"Alternative 2","year":"2021","type":"movie","confidence":"medium"},
+  {"title":"Alternative 3","year":"2018","type":"tv","confidence":"low"}
+]
 
-Example:
-[{"title":"Inception","year":"2010","type":"movie","confidence":"high"},{"title":"Interstellar","year":"2014","type":"movie","confidence":"medium"},{"title":"Tenet","year":"2020","type":"movie","confidence":"medium"},{"title":"The Matrix","year":"1999","type":"movie","confidence":"low"}]
+RULES:
+- "type" must be exactly "movie" or "tv" (lowercase)
+- "confidence" must be "high", "medium", or "low"
+- Use original English titles
+- Year must be 4 digits
+- First result should be your best guess
+- Include alternatives that match visual style/genre if uncertain
 
-Return only the JSON array:''';
+FOCUS ON:
+- Visual scenes, characters, setting
+- Acting style and facial features
+- Production quality
+- Color grading and visual style
+- Time period indicators
+
+Return ONLY the JSON array.''';
 
       final requestBody = {
         "contents": [
@@ -333,9 +525,9 @@ Return only the JSON array:''';
           }
         ],
         "generationConfig": {
-          "temperature": 0.4,
-          "topK": 32,
-          "topP": 1,
+          "temperature": 0.3,
+          "topK": 40,
+          "topP": 0.95,
           "maxOutputTokens": 2048,
         }
       };
@@ -348,24 +540,21 @@ Return only the JSON array:''';
 
       if (response.statusCode != 200) {
         debugPrint('❌ Gemini API Error: ${response.statusCode}');
-        debugPrint('Response: ${response.body}');
         return null;
       }
 
       final data = jsonDecode(response.body);
       
       if (data['candidates'] == null || data['candidates'].isEmpty) {
-        debugPrint('❌ No candidates in response');
         return null;
       }
 
       final text = data['candidates'][0]['content']['parts'][0]['text'];
-      debugPrint('📝 Gemini response (${text.length} chars): $text');
+      debugPrint('📝 Gemini response (${text.length} chars)');
 
-      // Clean and parse JSON
+      // Same cleaning logic
       String cleanText = text.trim();
       
-      // Remove markdown code blocks
       if (cleanText.startsWith('```json')) {
         cleanText = cleanText.substring(7);
       } else if (cleanText.startsWith('```')) {
@@ -378,45 +567,21 @@ Return only the JSON array:''';
       
       cleanText = cleanText.trim();
 
-      // ✅ Try to fix incomplete JSON
       if (!cleanText.endsWith(']')) {
-        debugPrint('⚠️ JSON incomplete, attempting to fix...');
-        
-        // Find last complete object
         int lastCompleteIndex = cleanText.lastIndexOf('},');
         if (lastCompleteIndex > 0) {
-          cleanText = cleanText.substring(0, lastCompleteIndex + 1);
-          cleanText += '\n]';
-          debugPrint('🔧 Fixed JSON by closing array');
-        } else {
-          // Try to close current object
-          int lastOpenBrace = cleanText.lastIndexOf('{');
-          if (lastOpenBrace > 0) {
-            cleanText = cleanText.substring(0, lastOpenBrace);
-            if (cleanText.endsWith(',')) {
-              cleanText = cleanText.substring(0, cleanText.length - 1);
-            }
-            cleanText += '\n]';
-            debugPrint('🔧 Fixed JSON by removing incomplete object');
-          }
+          cleanText = cleanText.substring(0, lastCompleteIndex + 1) + '\n]';
         }
       }
-
-      debugPrint('🔍 Attempting to parse JSON (${cleanText.length} chars)...');
 
       List<dynamic> parsed;
       try {
         parsed = jsonDecode(cleanText);
       } catch (e) {
-        debugPrint('❌ JSON parse failed: $e');
-        debugPrint('📄 Clean text: $cleanText');
-        
-        // Last resort: try to extract complete objects manually
+        // Manual extraction fallback
         final objects = <Map<String, dynamic>>[];
         final regex = RegExp(r'\{[^}]+\}', multiLine: true);
-        final matches = regex.allMatches(cleanText);
-        
-        for (final match in matches) {
+        for (final match in regex.allMatches(cleanText)) {
           try {
             final obj = jsonDecode(match.group(0)!);
             if (obj is Map && obj.containsKey('title')) {
@@ -424,17 +589,11 @@ Return only the JSON array:''';
             }
           } catch (_) {}
         }
-        
-        if (objects.isEmpty) {
-          debugPrint('❌ Could not extract any valid objects');
-          return null;
-        }
-        
-        debugPrint('✅ Extracted ${objects.length} objects manually');
+        if (objects.isEmpty) return null;
         parsed = objects;
       }
       
-      final List<Map<String, dynamic>> suggestions = parsed.map((item) {
+      final suggestions = parsed.map((item) {
         return {
           'title': item['title']?.toString() ?? 'Unknown',
           'year': item['year']?.toString() ?? '2020',
@@ -443,22 +602,13 @@ Return only the JSON array:''';
         };
       }).toList();
 
-      // Ensure we have at least 1 suggestion
-      if (suggestions.isEmpty) {
-        debugPrint('❌ No valid suggestions extracted');
-        return null;
-      }
+      if (suggestions.isEmpty) return null;
 
       debugPrint('✅ Parsed ${suggestions.length} suggestions');
-      for (int i = 0; i < suggestions.length; i++) {
-        debugPrint('  ${i + 1}. ${suggestions[i]['title']} (${suggestions[i]['year']}) - ${suggestions[i]['confidence']}');
-      }
-
       return suggestions;
 
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error analyzing frames: $e');
-      debugPrint('Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}');
+    } catch (e) {
+      debugPrint('❌ Error: $e');
       return null;
     }
   }
